@@ -46,7 +46,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman.git"
+    "url": "git+https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman.git"
   },
   "bugs": {
     "url": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman/issues"
