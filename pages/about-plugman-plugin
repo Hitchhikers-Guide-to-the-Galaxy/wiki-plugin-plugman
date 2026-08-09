@@ -80,6 +80,11 @@
    "type": "paragraph",
    "id": "332c5da9a77f5fb4",
    "text": "Say BROWSE to show the about page browsing menu."
+  },
+  {
+   "type": "markdown",
+   "id": "69d2b6f107f29fe6",
+   "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
   }
  ],
  "journal": [
@@ -173,6 +178,16 @@
    },
    "date": 1786291816503,
    "provenance": "Cloned from wiki-plugin-plugmatic v1.5.1 by Claude Code with David Bovill"
+  },
+  {
+   "type": "add",
+   "id": "69d2b6f107f29fe6",
+   "date": 1786292188649,
+   "item": {
+    "type": "markdown",
+    "id": "69d2b6f107f29fe6",
+    "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
+   }
   }
  ],
  "plugin": "plugman"
