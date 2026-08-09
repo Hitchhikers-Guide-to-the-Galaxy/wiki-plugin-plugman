@@ -1,0 +1,49 @@
+{
+ "title": "PlugMan Browse",
+ "story": [
+  {
+   "type": "paragraph",
+   "id": "3c24092a4563c38b",
+   "text": "Browse every plugin installed on this server, grouped by factory category. Shift-click or use the details to explore each plugin's about pages."
+  },
+  {
+   "type": "plugman",
+   "id": "050090c09ba16f94",
+   "text": "BROWSE"
+  },
+  {
+   "type": "paragraph",
+   "id": "bfcd2473ac8408e7",
+   "text": "See [[About PlugMan Plugin]] for the full markup this plugin understands."
+  }
+ ],
+ "journal": [
+  {
+   "type": "create",
+   "id": "8fb2316a1b9b3bd8",
+   "item": {
+    "title": "PlugMan Browse",
+    "story": [
+     {
+      "type": "paragraph",
+      "id": "3c24092a4563c38b",
+      "text": "Browse every plugin installed on this server, grouped by factory category. Shift-click or use the details to explore each plugin's about pages."
+     },
+     {
+      "type": "plugman",
+      "id": "050090c09ba16f94",
+      "text": "BROWSE"
+     },
+     {
+      "type": "paragraph",
+      "id": "bfcd2473ac8408e7",
+      "text": "See [[About PlugMan Plugin]] for the full markup this plugin understands."
+     }
+    ]
+   },
+   "date": 1786291816503,
+   "provenance": "Cloned from wiki-plugin-plugmatic v1.5.1 by Claude Code with David Bovill"
+  }
+ ],
+ "plugin": "plugman"
+}

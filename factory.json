@@ -1,6 +1,6 @@
 {
-  "name": "Plugmatic",
-  "title": "Plugmatic Plugin",
+  "name": "PlugMan",
+  "title": "PlugMan Plugin",
   "category": "other",
-  "pages": ["Browse All Plugins"]
+  "pages": ["PlugMan Browse"]
 }

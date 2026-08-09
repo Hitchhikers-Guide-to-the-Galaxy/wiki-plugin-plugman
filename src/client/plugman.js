@@ -8,6 +8,7 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
 
+import { NAME } from './name.js'
 import { render } from './render.js'
 import { browse } from './browse.js'
 
@@ -78,9 +79,9 @@ const emit = async function ($item, item) {
         body: JSON.stringify(markup),
         headers: { 'Content-Type': 'application/json' },
       }
-      renderproxy(await fetch('/plugin/plugmatic/plugins', options).then(res => res.json()))
+      renderproxy(await fetch(`/plugin/${NAME}/plugins`, options).then(res => res.json()))
     } else {
-      renderproxy(await fetch('/plugin/plugmatic/plugins').then(res => res.json()))
+      renderproxy(await fetch(`/plugin/${NAME}/plugins`).then(res => res.json()))
     }
   } catch (err) {
     $item.find('p').html('server error')
@@ -89,11 +90,11 @@ const emit = async function ($item, item) {
 
 const bind = ($item, item) => $item.on('dblclick', () => wiki.textEditor($item, item))
 
-const plugmaticListener = function (event) {
-  if (!event.source.opener || event.source.location.pathname !== '/plugins/plugmatic/dialog/') {
+const plugmanListener = function (event) {
+  if (!event.source.opener || event.source.location.pathname !== `/plugins/${NAME}/dialog/`) {
     return
   }
-  console.log('plugmatic listerner', event)
+  console.log(`${NAME} listener`, event)
 
   const { data } = event
 
@@ -117,27 +118,21 @@ const plugmaticListener = function (event) {
       wiki.doInternalLink(title, $page)
       break
     default:
-      return console.error({ where: 'plugmaticListener', message: 'unknown action', data })
+      return console.error({ where: `${NAME}Listener`, message: 'unknown action', data })
   }
 }
 
 if (typeof window !== 'undefined' && window !== null) {
-  if (typeof window.plugmaticListener === 'undefined' || window.plugmaticListener === null) {
-    console.log('*** Plugmatic - Adding Message Listener')
-    window.plugmaticListener = plugmaticListener
-    window.addEventListener('message', plugmaticListener)
+  const key = `${NAME}Listener`
+  if (typeof window[key] === 'undefined' || window[key] === null) {
+    console.log(`*** ${NAME} - Adding Message Listener`)
+    window[key] = plugmanListener
+    window.addEventListener('message', plugmanListener)
   }
 }
 
-// if (typeof window !== 'undefined' && window !== null) {
-//   window.plugins.plugmatic = { emit, bind }
-// }
-// if (typeof module !== 'undefined' && module !== null) {
-//   module.exports = { parse }
-// }
-
 if (typeof window !== 'undefined') {
-  window.plugins.plugmatic = { emit, bind }
+  window.plugins[NAME] = { emit, bind }
 }
 
-export const plugmatic = typeof window == 'undefined' ? { parse } : undefined
+export const plugman = typeof window == 'undefined' ? { parse } : undefined

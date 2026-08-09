@@ -1,17 +1,17 @@
 {
-  "name": "wiki-plugin-plugmatic",
-  "version": "1.5.1",
-  "description": "Federated Wiki - Plugmatic Plugin",
+  "name": "wiki-plugin-plugman",
+  "version": "0.1.0",
+  "description": "Federated Wiki - PlugMan Plugin, a plugin manager grown from a clone of Plugmatic",
   "keywords": [
+    "plugman",
     "plugmatic",
     "wiki",
     "federated wiki",
     "plugin"
   ],
   "author": {
-    "name": "Ward Cunningham",
-    "email": "ward@c2.com",
-    "url": "http://ward.asia.wiki.org"
+    "name": "David Bovill",
+    "url": "https://david.bovill.me"
   },
   "contributors": [
     "Ward Cunningham <ward@c2.com>",
@@ -21,13 +21,19 @@
   ],
   "scripts": {
     "build": "npm run clean; eslint; npm run test; node scripts/build-client.js",
-    "clean": "rm client/plugmatic.js client/plugmatic.js.map",
+    "clean": "rm -f client/plugman.js client/plugman.js.map client/plugmatic.js client/plugmatic.js.map",
     "lint": "eslint",
     "test": "node --test",
     "prettier:format": "prettier --write './**/*.js'",
     "prettier:check": "prettier --check ./**/*.js",
     "update-authors": "node scripts/update-authors.cjs"
   },
+  "files": [
+    "client",
+    "server",
+    "pages",
+    "factory.json"
+  ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "esbuild": "^0.28.0",
@@ -40,13 +46,14 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wardcunningham/wiki-plugin-plugmatic.git"
+    "url": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman.git"
   },
   "bugs": {
-    "url": "https://github.com/wardcunningham/wiki-plugin-plugmatic/issues"
+    "url": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman/issues"
   },
+  "homepage": "http://plugin.fedwiki.club/view/plugman-plugin",
   "engines": {
-    "node": ">=0.10"
+    "node": ">=18"
   },
   "type": "module",
   "dependencies": {

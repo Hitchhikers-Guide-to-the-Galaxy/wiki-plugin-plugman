@@ -1,3 +1,5 @@
+import { NAME } from './name.js'
+
 const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 const expand = function (string) {
@@ -142,14 +144,14 @@ export const render = function (data, $item, markup) {
       $item.find('button.restart').removeAttr('disabled').show()
     }
 
-    window.plugins.plugmatic.install = async function (version) {
+    window.plugins[NAME].install = async function (version) {
       try {
         const options = {
           method: 'POST',
           body: JSON.stringify({ version, plugin: row.plugin }),
           headers: { 'Content-Type': 'application/json' },
         }
-        const update = await fetch('/plugin/plugmatic/install', options).then(res => res.json())
+        const update = await fetch(`/plugin/${NAME}/install`, options).then(res => res.json())
         installed(update)
         $row.find('[title=status]').css('color', 'white')
         dialog.close()
@@ -166,7 +168,7 @@ export const render = function (data, $item, markup) {
       }
     }
     const choice = function (version) {
-      const button = () => `<button onclick=window.plugins.plugmatic.install('${version}')> install </button>`
+      const button = () => `<button onclick=window.plugins.${NAME}.install('${version}')> install </button>`
       return `<tr> <td> ${version} <td> ${version === (row.package != null ? row.package.version : undefined) ? 'installed' : button()}`
     }
     const choices = (() => {
@@ -201,7 +203,7 @@ export const render = function (data, $item, markup) {
         return 'built-in'
       }
     }
-    const npmjs = more => $.getJSON(`/plugin/plugmatic/view/${name}`, more)
+    const npmjs = more => $.getJSON(`/plugin/${NAME}/view/${name}`, more)
     switch (column) {
       case 'status':
         return npmjs(npm => done(installer(row, npm)))
@@ -244,16 +246,16 @@ export const render = function (data, $item, markup) {
         // wiki.dialog "#{name} plugin #{column}", html || ''
         const pageKey = $item.parents('.page').data('key')
         const context = wiki.lineup.atKey(pageKey).getContext()
-        const plugmaticDialog = window.open('/plugins/plugmatic/dialog/#', 'plugmatic', 'popup,height=600,width=800')
-        if (plugmaticDialog.location.pathname !== '/plugins/plugmatic/dialog/') {
-          return plugmaticDialog.addEventListener('load', event =>
-            plugmaticDialog.postMessage(
+        const plugmanDialog = window.open(`/plugins/${NAME}/dialog/#`, NAME, 'popup,height=600,width=800')
+        if (plugmanDialog.location.pathname !== `/plugins/${NAME}/dialog/`) {
+          return plugmanDialog.addEventListener('load', event =>
+            plugmanDialog.postMessage(
               { column, title: `${name} plugin ${column}`, body: html || '', pageKey, context },
               window.origin,
             ),
           )
         } else {
-          return plugmaticDialog.postMessage(
+          return plugmanDialog.postMessage(
             { column, title: `${name} plugin ${column}`, body: html || '', pageKey, context },
             window.origin,
           )
@@ -289,7 +291,7 @@ export const render = function (data, $item, markup) {
     .on('click', event => {
       $item.find('button.restart').attr('disabled', 'disabled')
       try {
-        fetch('/plugin/plugmatic/restart', { method: 'POST' })
+        fetch(`/plugin/${NAME}/restart`, { method: 'POST' })
       } catch (err) {
         $item.find('p').html('server error')
       }

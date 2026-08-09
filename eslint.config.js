@@ -13,6 +13,7 @@ export default [
     languageOptions: {
       globals: {
         wiki: 'readonly',
+        PLUGIN_NAME: 'readonly',
         require: 'readonly',
         module: 'readonly',
         process: 'readonly',

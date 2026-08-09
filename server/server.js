@@ -4,15 +4,30 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
-// plugmatic plugin, server-side component
+// plugman plugin, server-side component
 // These handlers are launched with the wiki server.
+// PlugMan began life as an explicit clone of wiki-plugin-plugmatic v1.5.1.
 
 import * as fs from 'node:fs'
+import * as nodePath from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { glob } from 'glob'
 import * as asyncLib from 'async'
 import jsonfile from 'jsonfile'
 import https from 'node:https'
 import { execFile } from 'node:child_process'
+
+const PACKAGE_RE = /^wiki-(?:plugin|security)-[\w-]+$/
+
+// wiki-server serves a plugin purely by its directory name in node_modules —
+// the directory is a seat, and this package may occupy either its own seat
+// (plugman) or the plugmatic seat via the fedwiki plugin-upgrade path.
+// Derive the seat we are actually serving from at load time.
+const seatOf = function () {
+  const dir = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '..')
+  const m = nodePath.basename(dir).match(/^wiki-(?:plugin|security)-([\w-]+)$/)
+  return m ? m[1] : 'plugman'
+}
 
 const github = function (path, done) {
   const options = {
@@ -52,7 +67,16 @@ const startServer = function (params) {
       }),
   )
 
-  const route = endpoint => `/plugin/plugmatic/${endpoint}`
+  const seat = seatOf()
+  // Answer on the sibling prefix too, but only when that plugin is not itself
+  // installed — never shadow a real plugmatic (or a real plugman).
+  const sibling = { plugman: 'plugmatic', plugmatic: 'plugman' }[seat]
+  const bases = [seat]
+  if (sibling && !fs.existsSync(`${argv.packageDir}/wiki-plugin-${sibling}`)) {
+    bases.push(sibling)
+  }
+
+  const route = endpoint => bases.map(base => `/plugin/${base}/${endpoint}`)
   const path = file => `${argv.packageDir}/${file}`
 
   const info = function (file, done) {
@@ -93,12 +117,6 @@ const startServer = function (params) {
         site.authors = authors
         return cb()
       })
-    // persona = (cb) ->
-    //   fs.readFile path("#{file}/status/persona.identity"),'utf8', (err, identity) ->
-    //     site.persona = identity; cb()
-    // openid = (cb) ->
-    //   fs.readFile path("#{file}/status/open_id.identity"),'utf8', (err, identity) ->
-    //     site.openid = identity; cb()
     return asyncLib.series([birth, authors, packagejson, factory, pages], err => done(null, site))
   }
 
@@ -117,7 +135,7 @@ const startServer = function (params) {
       })
 
   const view = function (plugin, done) {
-    if (/^\w+$/.test(plugin)) {
+    if (/^[\w-]+$/.test(plugin)) {
       const pkg = `wiki-plugin-${plugin}`
       return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
         let npm
@@ -128,29 +146,22 @@ const startServer = function (params) {
         }
         return done(null, { plugin, pkg, npm })
       })
-    }
-  }
-
-  const farm = function (req, res, next) {
-    if (argv.f) {
-      return next()
     } else {
-      return res.status(404).send({ error: 'service requires farm mode' })
+      return done(null, { plugin, error: 'invalid plugin name' })
     }
   }
 
-  var admin = function (req, res, next) {
+  // Fix over plugmatic v1.5.1: the original reassigned its own function
+  // binding to a string on the failure path, destroying the middleware for
+  // every later request in the process.
+  const admin = function (req, res, next) {
     if (app.securityhandler.isAdmin(req)) {
       return next()
     } else {
-      let user
-      if (!argv.admin) {
-        admin = 'none specified'
-      }
-      if (!req.session?.passport?.user && !req.session?.email && !req.session?.friend) {
-        user = 'not logged in'
-      }
-      return res.status(403).send({ error: 'service requires admin user', admin, user })
+      const adminNote = argv.admin ? undefined : 'none specified'
+      const user =
+        !req.session?.passport?.user && !req.session?.email && !req.session?.friend ? 'not logged in' : undefined
+      return res.status(403).send({ error: 'service requires admin user', admin: adminNote, user })
     }
   }
 
@@ -169,15 +180,22 @@ const startServer = function (params) {
     }),
   )
 
-  app.get(route('file/:file/slug/:slug'), (req, res) =>
-    jsonfile.readFile(path(`${req.params.file}/pages/${req.params.slug}`), { throws: false }, function (err, page) {
-      if (err) {
+  // Fix over plugmatic v1.5.1: both params interpolated into a filesystem
+  // path unsanitised — a path-traversal hole.
+  app.get(route('file/:file/slug/:slug'), (req, res) => {
+    const file = nodePath.basename(req.params.file)
+    const slug = nodePath.basename(req.params.slug)
+    if (!PACKAGE_RE.test(file) || !/^[\w-]+$/.test(slug)) {
+      return res.sendStatus(400)
+    }
+    return jsonfile.readFile(path(`${file}/pages/${slug}`), { throws: false }, function (err, page) {
+      if (err || page == null) {
         return res.sendStatus(404)
       } else {
         return res.json(page)
       }
-    }),
-  )
+    })
+  })
 
   app.get(route('sitemap.json'), (req, res) =>
     plugmap(
@@ -223,18 +241,25 @@ const startServer = function (params) {
     return asyncLib.parallel([installed, published], err => res.json(payload))
   })
 
+  // Fix over plugmatic v1.5.1: invalid names got no response at all, and the
+  // raw stdout pipe had no error handler.
   app.get(route('view/:pkg'), function (req, res) {
-    if (/^\w+$/.test(req.params.pkg)) {
-      const pkg = `wiki-plugin-${req.params.pkg}`
-      res.setHeader('Content-Type', 'application/json')
-      return execFile('npm', ['view', `${pkg}`, '--json']).stdout.pipe(res)
+    if (!/^[\w-]+$/.test(req.params.pkg)) {
+      return res.status(400).json({ error: 'invalid plugin name' })
     }
+    const pkg = `wiki-plugin-${req.params.pkg}`
+    return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
+      res.setHeader('Content-Type', 'application/json')
+      return res.send(stdout || '{}')
+    })
   })
 
+  // Fix over plugmatic v1.5.1: requests failing validation now get a 400
+  // instead of no response (the original left the request hanging forever).
   app.post(route('install'), admin, function (req, res) {
-    if (/^\w+$/.test(req.body.plugin) && /^[\w.-]+$/.test(req.body.version)) {
+    if (/^[\w-]+$/.test(req.body.plugin) && /^[\w.-]+$/.test(req.body.version)) {
       const pkg = `wiki-plugin-${req.body.plugin}@${req.body.version}`
-      console.log(`plugmatic installing ${pkg}`)
+      console.log(`${seat} installing ${pkg}`)
       return execFile(
         'npm',
         ['install', `${pkg}`, '--json'],
@@ -255,11 +280,13 @@ const startServer = function (params) {
           }
         },
       )
+    } else {
+      return res.status(400).json({ error: 'invalid plugin name or version' })
     }
   })
 
   return app.post(route('restart'), admin, function (req, res) {
-    console.log('plugmatic exit to restart')
+    console.log(`${seat} exit to restart`)
     res.sendStatus(200)
     return process.exit(0)
   })
