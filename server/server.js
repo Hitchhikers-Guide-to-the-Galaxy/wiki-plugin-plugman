@@ -170,7 +170,8 @@ const startServer = function (params) {
   const view = function (plugin, done) {
     if (/^[\w-]+$/.test(plugin)) {
       const pkg = /^wiki-(?:plugin|security)-/.test(plugin) ? plugin : `wiki-plugin-${plugin}`
-      return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
+      // Bounded so a hung/slow npm cannot pin a subprocess indefinitely.
+      return execFile('npm', ['view', `${pkg}`, '--json'], { timeout: 30000 }, function (err, stdout, stderr) {
         let npm
         try {
           npm = JSON.parse(stdout)
@@ -257,19 +258,25 @@ const startServer = function (params) {
   app.post(route('plugins'), function (req, res) {
     const payload = { bundle }
 
+    // Validate every name to a canonical package name BEFORE it reaches the
+    // filesystem in info(). Without this a name like "wiki-plugin-x/../.." is
+    // interpolated into a path and escapes the plugin directory — an
+    // unauthenticated file-read/traversal. Cap the list so one request cannot
+    // fan out into an unbounded number of npm subprocesses.
+    const names = Array.from(req.body.plugins || [])
+      .slice(0, 100)
+      .map(fullName)
+      .filter(Boolean)
+
     const installed = function (cb) {
-      // Accept full names (wiki-plugin-x, wiki-security-x) or bare short names.
-      const files = Array.from(req.body.plugins || []).map(plugin =>
-        /^wiki-(?:plugin|security)-/.test(plugin) ? plugin : `wiki-plugin-${plugin}`,
-      )
-      return asyncLib.map(files || [], info, function (err, install) {
+      return asyncLib.map(names, info, function (err, install) {
         payload.install = install
         return cb()
       })
     }
 
     const published = cb =>
-      asyncLib.map(req.body.plugins || [], view, function (err, results) {
+      asyncLib.map(names, view, function (err, results) {
         payload.publish = results
         return cb()
       })
@@ -278,13 +285,15 @@ const startServer = function (params) {
   })
 
   // Fix over plugmatic v1.5.1: invalid names got no response at all, and the
-  // raw stdout pipe had no error handler.
-  app.get(route('view/:pkg'), function (req, res) {
+  // raw stdout pipe had no error handler. Admin-gated and timeout-bounded so
+  // this npm-spawning route cannot be used as an unauthenticated DoS amplifier
+  // — only admins need version lists (to install).
+  app.get(route('view/:pkg'), admin, function (req, res) {
     if (!/^[\w-]+$/.test(req.params.pkg)) {
       return res.status(400).json({ error: 'invalid plugin name' })
     }
     const pkg = /^wiki-(?:plugin|security)-/.test(req.params.pkg) ? req.params.pkg : `wiki-plugin-${req.params.pkg}`
-    return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
+    return execFile('npm', ['view', `${pkg}`, '--json'], { timeout: 30000 }, function (err, stdout, stderr) {
       res.setHeader('Content-Type', 'application/json')
       return res.send(stdout || '{}')
     })
@@ -380,8 +389,9 @@ const startServer = function (params) {
 
   // Per-plugin status, driving the Update All progress loop. installed comes
   // from the module's own package.json; published from npm (slow); symlinked
-  // and clientOk from the filesystem.
-  app.get(route('status/:pkg'), function (req, res) {
+  // and clientOk from the filesystem. Admin-gated: it spawns npm (a DoS
+  // amplifier if left open) and only the admin-driven update loop consumes it.
+  app.get(route('status/:pkg'), admin, function (req, res) {
     const full = fullName(req.params.pkg)
     if (!full) {
       return res.status(400).json({ error: 'invalid plugin name' })
@@ -459,6 +469,12 @@ const startServer = function (params) {
   // cookie. Secrets (per-domain owner secret, optional SSH restart fallback)
   // live in a mode-600 file, never in a route response.
   const DOMAIN_RE = /^[a-z0-9.-]+$/i
+  // A farm target is bad if it is malformed, or an IP literal in the loopback
+  // or link-local range. This blocks the worst SSRF targets (localhost and the
+  // 169.254.169.254 cloud-metadata endpoint) while still allowing LAN farms
+  // (pi5.local, 10./172./192.168 ranges) that this feature legitimately drives.
+  const badFarm = farm =>
+    !farm || !DOMAIN_RE.test(farm) || /^(localhost|127\.|169\.254\.|0\.0\.0\.0|::1)/i.test(farm)
   const loadSecrets = function () {
     const file = argv.plugman_secrets || process.env.PLUGMAN_SECRETS || `${process.env.HOME}/.wiki-plugman/secrets.json`
     try {
@@ -529,7 +545,7 @@ const startServer = function (params) {
 
   app.get(route('remote/status'), admin, async function (req, res) {
     const farm = req.query.farm
-    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
       const base = await discover(farm)
       const hasSecret = !!loadSecrets()[farm]?.secret
@@ -549,7 +565,7 @@ const startServer = function (params) {
     const { farm } = req.body
     const full = fullName(req.body.plugin)
     const version = req.body.version || 'latest'
-    if (!farm || !DOMAIN_RE.test(farm) || !full) return res.status(400).json({ error: 'invalid farm or plugin' })
+    if (badFarm(farm) || !full) return res.status(400).json({ error: 'invalid/blocked farm or plugin' })
     try {
       const base = await discover(farm)
       const cookie = await remoteLogin(farm)
@@ -574,7 +590,7 @@ const startServer = function (params) {
   app.post(route('remote/uninstall'), admin, async function (req, res) {
     const { farm } = req.body
     const full = fullName(req.body.plugin)
-    if (!farm || !DOMAIN_RE.test(farm) || !full) return res.status(400).json({ error: 'invalid farm or plugin' })
+    if (badFarm(farm) || !full) return res.status(400).json({ error: 'invalid/blocked farm or plugin' })
     try {
       const base = await discover(farm)
       if (base !== 'plugman') return res.status(501).json({ error: 'remote farm runs plugmatic, which cannot uninstall' })
@@ -594,7 +610,7 @@ const startServer = function (params) {
 
   app.post(route('remote/restart'), admin, async function (req, res) {
     const { farm } = req.body
-    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
       const base = await discover(farm)
       const cookie = await remoteLogin(farm)
@@ -622,7 +638,7 @@ const startServer = function (params) {
 
   app.get(route('remote/ready'), admin, async function (req, res) {
     const farm = req.query.farm
-    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
       const r = await remoteFetch(`https://${farm}/system/factories.json`, {}, 8000)
       return res.status(r.ok ? 200 : 503).json({ farm, ready: r.ok })

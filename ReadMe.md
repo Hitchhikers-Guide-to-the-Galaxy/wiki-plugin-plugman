@@ -18,6 +18,36 @@ Add a PlugMan item and give it lines. Keywords choose report columns
 the catalogue, and a bare `wiki-plugin-name` (or `wiki-security-name`) line
 inventories that package.
 
+## Security model — read before deploying
+
+PlugMan installs and removes npm packages and restarts the server, so its
+admin routes are powerful. Understand the trust boundary before running it on
+any farm that other people can reach.
+
+- **Admin = host code execution.** `install`/`update` run `npm install`, and npm
+  runs a package's install scripts. The `wiki-plugin-`/`wiki-security-` prefix is
+  a naming convention, **not** a security boundary — anyone can publish a
+  malicious `wiki-plugin-*` to npm. So whoever can pass the `isAdmin` check can
+  run code on the server as the wiki user. **Treat the admin secret as root on
+  that host** and give it only to people you would give a shell.
+- **Safe by default.** With the default (no-security) module, `isAdmin` is always
+  false, so every mutating route returns 403 — PlugMan is inventory-only until a
+  security module and an admin secret are configured. Ordinary farm members
+  (non-admins) can never install, uninstall, or restart.
+- **Admin-gated:** `install`, `update`, `uninstall`, `restart`, all `remote/*`,
+  and the npm-spawning `view`/`status` reads.
+- **Unauthenticated (read-only):** `plugins`, `sitemap.json`, `page/:slug.json`,
+  `file/.../slug/...`, `ready`. These reveal the installed plugin inventory and
+  versions — fingerprinting information. Do not expose an admin-configured farm
+  to untrusted networks without a reverse proxy / rate limiting in front.
+- **Remote farms** are reached only by an admin, secrets live in
+  `~/.wiki-plugman/secrets.json` (**you must `chmod 600` it**), are scoped per
+  domain, and are never returned in a response. Loopback and link-local targets
+  (localhost, `169.254.169.254`) are blocked; LAN and public farms are allowed,
+  so an admin can still reach internal hosts — a deliberate SSRF surface.
+
+See the full audit at plugin.fedwiki.club (linked from the About page).
+
 ## Restarting the server
 
 PlugMan's `restart` route needs the server process to come back up. How that
