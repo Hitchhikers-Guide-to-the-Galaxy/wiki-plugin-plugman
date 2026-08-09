@@ -27,11 +27,10 @@ export const renderFarms = async function ($item, farms) {
     $item.append($section)
     const $table = $section.find('table')
 
-    let base = null
     let reachable = false
     try {
       const disc = await fetch(`/plugin/${NAME}/remote/status?farm=${encodeURIComponent(farm.domain)}`).then(r => r.json())
-      base = disc.remoteBase
+      const base = disc.remoteBase
       reachable = disc.reachable
       $section
         .find('.farm-note')

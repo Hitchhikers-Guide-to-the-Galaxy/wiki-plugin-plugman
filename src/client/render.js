@@ -167,6 +167,36 @@ export const render = function (data, $item, markup) {
       }
     }
 
+    window.plugins[NAME].uninstall = async function () {
+      if (
+        !window.confirm(
+          `Uninstall ${row.plugin}?\n\nIf this plugin is on the server's roster it will be ` +
+            `reinstalled on the next restart. The server must be restarted for the ` +
+            `removal to take effect.`,
+        )
+      ) {
+        return
+      }
+      try {
+        const result = await fetch(`/plugin/${NAME}/uninstall`, {
+          method: 'POST',
+          body: JSON.stringify({ plugin: row.plugin }),
+          headers: { 'Content-Type': 'application/json' },
+        }).then(res => res.json().then(j => ({ ok: res.ok, j })))
+        if (result.ok) {
+          $row.find('[title=installed]').text('')
+          $row.find('[title=status]').css('color', '#ccc')
+          $item.find('button.restart').removeAttr('disabled').show()
+          $item.find('.plugman-status').text(`${row.plugin} removed — restart to apply.`)
+        } else {
+          $item.find('.plugman-status').text(`uninstall failed: ${result.j.error || ''}`)
+        }
+        dialog.close()
+      } catch (err) {
+        $item.find('p').html('server error')
+      }
+    }
+
     const array = function (obj) {
       if (typeof obj === 'string') {
         return [obj]
@@ -185,7 +215,11 @@ export const render = function (data, $item, markup) {
       }
       return result
     })()
-    return `<h3>${npm.description}</h3> <p>Choose a version to install.</p> <table>${choices.join('\n')}`
+    const uninstall =
+      row.package != null
+        ? `<p><button onclick=window.plugins.${NAME}.uninstall()> uninstall </button> ${row.plugin}</p>`
+        : ''
+    return `<h3>${npm.description}</h3>${uninstall}<p>Choose a version to install.</p> <table>${choices.join('\n')}`
   }
 
   const detail = function (name, done) {

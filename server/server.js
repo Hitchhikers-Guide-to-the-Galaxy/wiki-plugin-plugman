@@ -93,6 +93,8 @@ const startServer = function (params) {
   })()
 
   const seat = seatOf()
+  // The package dir this server runs from — refuse to uninstall ourselves.
+  const ownPackage = nodePath.basename(nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '..'))
   // Answer on the sibling prefix too, but only when that plugin is not itself
   // installed — never shadow a real plugmatic (or a real plugman).
   const sibling = { plugman: 'plugmatic', plugmatic: 'plugman' }[seat]
@@ -316,6 +318,58 @@ const startServer = function (params) {
     } else {
       return res.status(400).json({ error: 'invalid plugin name or version' })
     }
+  })
+
+  // Uninstall a plugin via npm. Guards keep us from breaking the farm or the
+  // dev workflow; the post-condition check catches the dependency-without-module
+  // state that crashes wiki-server >= 0.40 and restores the module if it happens.
+  app.post(route('uninstall'), admin, function (req, res) {
+    const full = fullName(req.body.plugin)
+    if (!full) return res.status(400).json({ error: 'invalid plugin name' })
+    const dir = `${argv.packageDir}/${full}`
+    // 409 guards
+    if (full === ownPackage) return res.status(409).json({ error: 'refusing to uninstall the running plugin', name: full })
+    // argv.security_type may be a bare type ("hitchhiker") or a full package
+    // name ("wiki-security-hitchhiker") depending on how the farm was configured.
+    const activeSecurity = /^wiki-security-/.test(argv.security_type || '')
+      ? argv.security_type
+      : argv.security_type
+        ? `wiki-security-${argv.security_type}`
+        : null
+    if (activeSecurity && full === activeSecurity) {
+      return res.status(409).json({ error: 'refusing to uninstall the active security module', name: full })
+    }
+    try {
+      if (fs.lstatSync(dir).isSymbolicLink()) {
+        return res.status(409).json({ error: 'plugin is a dev symlink; uninstall skipped', name: full })
+      }
+    } catch (e) {
+      return res.status(404).json({ error: 'plugin is not installed', name: full })
+    }
+    const pkgRoot = argv.packageDir + '/..'
+    console.log(`${seat} uninstalling ${full}`)
+    return execFile('npm', ['remove', full, '--json'], { cwd: pkgRoot, timeout: 120000 }, function (err, stdout, stderr) {
+      // Post-condition: the dependency AND the module directory must both be
+      // gone. If the dep lingers while the module is gone (the farm-crash
+      // state), reinstall to restore consistency and report 500.
+      let depGone = true
+      try {
+        const pj = JSON.parse(fs.readFileSync(`${pkgRoot}/package.json`, 'utf8'))
+        depGone = !(pj.dependencies && pj.dependencies[full])
+      } catch (e) {
+        /* can't read — treat as unknown */
+      }
+      const moduleGone = !fs.existsSync(dir)
+      if (!depGone && moduleGone) {
+        return execFile('npm', ['install', full, '--json'], { cwd: pkgRoot, timeout: 120000 }, () =>
+          res.status(500).json({ error: 'uninstall left an inconsistent state; module restored', name: full, stderr }),
+        )
+      }
+      if (err && !moduleGone) {
+        return res.status(400).json({ error: 'server unable to uninstall plugin', name: full, stderr })
+      }
+      return res.json({ name: full, removed: true, packageJsonClean: depGone })
+    })
   })
 
   // Cheap liveness probe — used by the client to know the server is back after
