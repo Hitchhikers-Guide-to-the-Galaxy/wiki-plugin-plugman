@@ -11,12 +11,22 @@
 import { NAME } from './name.js'
 import { render } from './render.js'
 import { browse } from './browse.js'
+import { renderFarms } from './farms.js'
 
 const parse = function (text) {
-  const result = { columns: [], plugins: [], features: [] }
+  const result = { columns: [], plugins: [], features: [], farms: [] }
   const lines = (text || '').split(/\n+/)
+  // `FARM <domain>` scopes the plugin lines that follow it to that remote farm,
+  // until the next FARM line. Plugin lines before any FARM belong to the local
+  // server (result.plugins).
+  let currentFarm = null
   for (var line of lines) {
     var m
+    if ((m = line.match(/^FARM\s+([a-z0-9.-]+)\s*$/i))) {
+      currentFarm = { domain: m[1], plugins: [] }
+      result.farms.push(currentFarm)
+      continue
+    }
     if (line.match(/\bSTATUS\b/)) {
       result.columns.push('status')
     }
@@ -46,8 +56,12 @@ const parse = function (text) {
       result.features.push('browse')
     }
 
-    if ((m = line.match(/^wiki-plugin-(\w+)$/))) {
-      result.plugins.push(m[1])
+    // Widened over plugmatic: keep hyphenated names (diagram-editor) and
+    // wiki-security-* packages, which the original silently dropped. Carry the
+    // full package name; the renderer strips the prefix for display.
+    if ((m = line.match(/^(wiki-(?:plugin|security)-[\w-]+)$/))) {
+      if (currentFarm) currentFarm.plugins.push(m[1])
+      else result.plugins.push(m[1])
     }
   }
   if (result.columns.length === 0) {
@@ -72,8 +86,15 @@ const emit = async function ($item, item) {
     else render(data, $item, markup)
   }
 
+  // A FARM-only item (no local plugin lines, no BROWSE) has no local table to
+  // draw — clear the placeholder and render just the remote sections. Otherwise
+  // draw the local table: POST when specific plugins are listed (so the server
+  // also fetches published versions), GET for the full catalogue.
+  const farmOnly = markup.farms.length > 0 && markup.plugins.length === 0 && !markup.features.includes('browse')
   try {
-    if (markup.plugins.length) {
+    if (farmOnly) {
+      $item.find('p').remove()
+    } else if (markup.plugins.length) {
       const options = {
         method: 'POST',
         body: JSON.stringify(markup),
@@ -85,6 +106,15 @@ const emit = async function ($item, item) {
     }
   } catch (err) {
     $item.find('p').html('server error')
+  }
+
+  // Remote farm sections, if any FARM lines were present.
+  if (markup.farms && markup.farms.length) {
+    try {
+      await renderFarms($item, markup.farms)
+    } catch (err) {
+      $item.append('<p style="color:#888;">could not load remote farms</p>')
+    }
   }
 }
 

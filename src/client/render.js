@@ -59,7 +59,8 @@ export const render = function (data, $item, markup) {
   let column = 'installed'
   const pub = name => data.publish.find(obj => obj.plugin === name)
   const format = function (markup, plugin, dependencies) {
-    const name = plugin.plugin
+    const name = plugin.plugin // full package name — the row key
+    const short = plugin.short || name.replace(/^wiki-(?:plugin|security)-/, '') // display
     const months = plugin.birth ? ((Date.now() - plugin.birth) / 1000 / 3600 / 24 / 31.5).toFixed(0) : ''
     const status = function () {
       const installed = plugin.package != null ? plugin.package.version : undefined
@@ -75,7 +76,7 @@ export const render = function (data, $item, markup) {
             case 'status':
               return `<td title=status style='text-align:center; color: ${status()}'>◉`
             case 'name':
-              return `<td title=name> ${name}`
+              return `<td title=name> ${short}`
             case 'menu':
               return `<td title=menu> ${(plugin.factory != null ? plugin.factory.category : undefined) || ''}`
             case 'pages':
@@ -83,7 +84,7 @@ export const render = function (data, $item, markup) {
             case 'service':
               return `<td title=service style='text-align:center;'>${months}`
             case 'bundled':
-              return `<td title=bundled> ${dependencies['wiki-plugin-' + name] || ''}`
+              return `<td title=bundled> ${dependencies[name] || ''}`
             case 'installed':
               return `<td title=installed> ${(plugin.package != null ? plugin.package.version : undefined) || ''}`
             case 'published':
@@ -138,7 +139,7 @@ export const render = function (data, $item, markup) {
     if (npm == null) {
       return `<p>can't find wiki-plugin-${row.plugin} in <a href=//npmjs.com target=_blank>npmjs.com</a></p>`
     }
-    const $row = $item.find(`table [data-name=${row.plugin}]`)
+    const $row = $item.find(`table [data-name="${row.plugin}"]`)
     const installed = function (update) {
       const index = data.install.indexOf(row)
       data.install[index] = row = update.row

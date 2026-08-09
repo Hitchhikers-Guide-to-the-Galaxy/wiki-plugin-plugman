@@ -67,15 +67,41 @@ describe('plugman plugin', function () {
     })
   })
 
-  return describe('inventory', function () {
-    it('recognizes plugins', function () {
+  describe('inventory', function () {
+    it('recognizes plugins by full name', function () {
       const result = plugman.parse('wiki-plugin-method')
-      return expect(result.plugins).to.eql(['method'])
+      return expect(result.plugins).to.eql(['wiki-plugin-method'])
     })
 
-    return it('recognizes multiple plugins', function () {
+    it('recognizes multiple plugins', function () {
       const result = plugman.parse('wiki-plugin-method\nwiki-plugin-mumble')
-      return expect(result.plugins).to.eql(['method', 'mumble'])
+      return expect(result.plugins).to.eql(['wiki-plugin-method', 'wiki-plugin-mumble'])
+    })
+
+    it('keeps hyphenated names (plugmatic dropped these)', function () {
+      const result = plugman.parse('wiki-plugin-diagram-editor')
+      return expect(result.plugins).to.eql(['wiki-plugin-diagram-editor'])
+    })
+
+    return it('recognizes security plugins (plugmatic dropped these)', function () {
+      const result = plugman.parse('wiki-security-hitchhiker')
+      return expect(result.plugins).to.eql(['wiki-security-hitchhiker'])
+    })
+  })
+
+  return describe('farms', function () {
+    it('scopes plugins under a FARM line to that farm', function () {
+      const result = plugman.parse('wiki-plugin-pod\nFARM example.earth\nwiki-plugin-farm')
+      expect(result.plugins).to.eql(['wiki-plugin-pod'])
+      expect(result.farms.length).to.eql(1)
+      expect(result.farms[0].domain).to.eql('example.earth')
+      return expect(result.farms[0].plugins).to.eql(['wiki-plugin-farm'])
+    })
+
+    return it('supports multiple FARM sections', function () {
+      const result = plugman.parse('FARM a.earth\nwiki-plugin-x\nFARM b.fish\nwiki-plugin-y')
+      expect(result.farms.map(f => f.domain)).to.eql(['a.earth', 'b.fish'])
+      return expect(result.farms[1].plugins).to.eql(['wiki-plugin-y'])
     })
   })
 })

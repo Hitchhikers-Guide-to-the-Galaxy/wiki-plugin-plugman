@@ -23,19 +23,23 @@ export function browse(data, $item) {
     ${install
       .filter(plugin => {
         const have = plugin.factory?.category
-        if (system.includes(plugin.plugin)) return category == 'system'
+        if (system.includes(short(plugin))) return category == 'system'
         return category == (have || 'option')
       })
-      .toSorted((a,b) => a.plugin.localeCompare(b.plugin))
+      .toSorted((a,b) => short(a).localeCompare(short(b)))
       .map(format)
       .join('\n')}`,
   )
+
+  function short(plugin) {
+    return plugin.short || (plugin.plugin || '').replace(/^wiki-(?:plugin|security)-/, '')
+  }
 
   function format(plugin) {
     return `
       <details>
         <summary><a href=# style="text-decoration: none;">
-          ${plugin.plugin}</a> — ${plugin.factory?.title ?? '<i style="color:#888">missing</i>'}
+          ${short(plugin)}</a> — ${plugin.factory?.title ?? '<i style="color:#888">missing</i>'}
         </summary>
         ${details(plugin)}
       </details>

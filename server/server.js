@@ -105,11 +105,15 @@ const startServer = function (params) {
   const path = file => `${argv.packageDir}/${file}`
 
   const info = function (file, done) {
-    const plugin = file.slice(12)
-    const site = { plugin }
+    // `file` is the full package dir name. Carry the full name as the identity
+    // (the only unambiguous key across wiki-plugin-* and wiki-security-*), and
+    // a short name for display and the client-file check.
+    const plugin = file
+    const short = file.replace(/^wiki-(?:plugin|security)-/, '')
+    const site = { plugin, short }
 
     const birth = cb =>
-      fs.stat(path(`${file}/client/${plugin}.js`), function (err, stat) {
+      fs.stat(path(`${file}/client/${short}.js`), function (err, stat) {
         site.birth = stat?.birthtime?.getTime()
         return cb()
       })
@@ -146,7 +150,7 @@ const startServer = function (params) {
   }
 
   const plugmap = done =>
-    glob('wiki-plugin-*', { cwd: argv.packageDir })
+    glob('wiki-{plugin,security}-*', { cwd: argv.packageDir })
       .then(files => {
         return asyncLib.map(files || [], info, function (err, install) {
           if (err) {
@@ -159,9 +163,11 @@ const startServer = function (params) {
         return done(err, null)
       })
 
+  // Accept a full package name or a short name; key the result by whatever was
+  // passed in (the client keys `publish` lookups by the same value).
   const view = function (plugin, done) {
     if (/^[\w-]+$/.test(plugin)) {
-      const pkg = `wiki-plugin-${plugin}`
+      const pkg = /^wiki-(?:plugin|security)-/.test(plugin) ? plugin : `wiki-plugin-${plugin}`
       return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
         let npm
         try {
@@ -232,7 +238,7 @@ const startServer = function (params) {
   )
 
   app.get(route('plugins'), (req, res) =>
-    glob('wiki-plugin-*', { cwd: argv.packageDir })
+    glob('wiki-{plugin,security}-*', { cwd: argv.packageDir })
       .then(files => {
         return asyncLib.map(files || [], info, function (err, install) {
           if (err) {
@@ -250,7 +256,10 @@ const startServer = function (params) {
     const payload = { bundle }
 
     const installed = function (cb) {
-      const files = Array.from(req.body.plugins || []).map(plugin => `wiki-plugin-${plugin}`)
+      // Accept full names (wiki-plugin-x, wiki-security-x) or bare short names.
+      const files = Array.from(req.body.plugins || []).map(plugin =>
+        /^wiki-(?:plugin|security)-/.test(plugin) ? plugin : `wiki-plugin-${plugin}`,
+      )
       return asyncLib.map(files || [], info, function (err, install) {
         payload.install = install
         return cb()
@@ -272,7 +281,7 @@ const startServer = function (params) {
     if (!/^[\w-]+$/.test(req.params.pkg)) {
       return res.status(400).json({ error: 'invalid plugin name' })
     }
-    const pkg = `wiki-plugin-${req.params.pkg}`
+    const pkg = /^wiki-(?:plugin|security)-/.test(req.params.pkg) ? req.params.pkg : `wiki-plugin-${req.params.pkg}`
     return execFile('npm', ['view', `${pkg}`, '--json'], function (err, stdout, stderr) {
       res.setHeader('Content-Type', 'application/json')
       return res.send(stdout || '{}')
@@ -282,8 +291,9 @@ const startServer = function (params) {
   // Fix over plugmatic v1.5.1: requests failing validation now get a 400
   // instead of no response (the original left the request hanging forever).
   app.post(route('install'), admin, function (req, res) {
-    if (/^[\w-]+$/.test(req.body.plugin) && /^[\w.-]+$/.test(req.body.version)) {
-      const pkg = `wiki-plugin-${req.body.plugin}@${req.body.version}`
+    const full = fullName(req.body.plugin)
+    if (full && /^[\w.-]+$/.test(req.body.version)) {
+      const pkg = `${full}@${req.body.version}`
       console.log(`${seat} installing ${pkg}`)
       return execFile(
         'npm',
@@ -299,9 +309,7 @@ const startServer = function (params) {
           if (err) {
             return res.status(400).json({ error: 'server unable to install plugin', npm, stderr })
           } else {
-            return info(`wiki-plugin-${req.body.plugin}`, (err, row) =>
-              res.json({ installed: req.body.version, npm, stderr, row }),
-            )
+            return info(full, (err, row) => res.json({ installed: req.body.version, npm, stderr, row }))
           }
         },
       )
@@ -389,6 +397,184 @@ const startServer = function (params) {
         return info(full, (err, row) => res.json({ name: full, installed: version, npm, stderr, row }))
       },
     )
+  })
+
+  // ── Remote farms (FARM <domain>) ──────────────────────────────────────────
+  // PlugMan's own server proxies to a remote farm's plugmatic/plugman endpoints:
+  // a browser cannot reach them cross-origin (CORS) nor carry the remote admin
+  // cookie. Secrets (per-domain owner secret, optional SSH restart fallback)
+  // live in a mode-600 file, never in a route response.
+  const DOMAIN_RE = /^[a-z0-9.-]+$/i
+  const loadSecrets = function () {
+    const file = argv.plugman_secrets || process.env.PLUGMAN_SECRETS || `${process.env.HOME}/.wiki-plugman/secrets.json`
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'))
+    } catch (e) {
+      return {}
+    }
+  }
+  const remoteCache = {} // domain → { base, cookie }
+
+  const remoteFetch = (url, opts, ms = 15000) =>
+    fetch(url, { ...opts, signal: AbortSignal.timeout(ms) })
+
+  // Discover whether a farm speaks plugman or plugmatic, cached per domain.
+  const discover = async function (farm) {
+    if (remoteCache[farm]?.base) return remoteCache[farm].base
+    try {
+      const r = await remoteFetch(`https://${farm}/plugin/plugman/ready`, {}, 12000)
+      if (r.ok) return (remoteCache[farm] = { ...remoteCache[farm], base: 'plugman' }).base
+    } catch (e) {
+      /* try plugmatic */
+    }
+    const r2 = await remoteFetch(`https://${farm}/plugin/plugmatic/plugins`, {}, 12000)
+    if (r2.ok) return (remoteCache[farm] = { ...remoteCache[farm], base: 'plugmatic' }).base
+    throw new Error('no plugman or plugmatic endpoint on farm')
+  }
+
+  // Log in to the remote as the site owner (friends/hitchhiker reclaim: the raw
+  // secret as a text/plain body), returning the session cookie to replay.
+  const remoteLogin = async function (farm) {
+    if (remoteCache[farm]?.cookie) return remoteCache[farm].cookie
+    const secret = loadSecrets()[farm]?.secret
+    if (!secret) return null
+    const r = await remoteFetch(`https://${farm}/auth/reclaim/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: secret,
+    })
+    if (!r.ok) return null
+    const set = r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get('set-cookie')].filter(Boolean)
+    const cookie = set.map(c => c.split(';')[0]).join('; ')
+    remoteCache[farm] = { ...remoteCache[farm], cookie }
+    return cookie
+  }
+
+  // Installed + published version of one plugin on a remote farm (read-only,
+  // no auth needed). Shape is normalised across the two remote bases.
+  const remotePkgStatus = async function (farm, base, pkg) {
+    const short = shortName(pkg) || pkg.replace(/^wiki-(?:plugin|security)-/, '')
+    if (base === 'plugman') {
+      const r = await remoteFetch(`https://${farm}/plugin/plugman/status/${pkg}`)
+      return r.ok ? await r.json() : { name: pkg, installed: null, published: null }
+    }
+    // plugmatic: POST plugins with the short name; read install[0].package + publish[0].npm
+    const r = await remoteFetch(`https://${farm}/plugin/plugmatic/plugins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plugins: [short] }),
+    })
+    if (!r.ok) return { name: pkg, installed: null, published: null }
+    const data = await r.json()
+    return {
+      name: pkg,
+      installed: data.install?.[0]?.package?.version || null,
+      published: data.publish?.[0]?.npm?.version || null,
+    }
+  }
+
+  app.get(route('remote/status'), admin, async function (req, res) {
+    const farm = req.query.farm
+    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    try {
+      const base = await discover(farm)
+      const hasSecret = !!loadSecrets()[farm]?.secret
+      const payload = { farm, remoteBase: base, reachable: true, hasSecret }
+      if (req.query.pkg) {
+        const full = fullName(req.query.pkg)
+        if (!full) return res.status(400).json({ error: 'invalid plugin name' })
+        Object.assign(payload, await remotePkgStatus(farm, base, full))
+      }
+      return res.json(payload)
+    } catch (e) {
+      return res.status(502).json({ farm, reachable: false, error: String(e.message || e) })
+    }
+  })
+
+  app.post(route('remote/install'), admin, async function (req, res) {
+    const { farm } = req.body
+    const full = fullName(req.body.plugin)
+    const version = req.body.version || 'latest'
+    if (!farm || !DOMAIN_RE.test(farm) || !full) return res.status(400).json({ error: 'invalid farm or plugin' })
+    try {
+      const base = await discover(farm)
+      const cookie = await remoteLogin(farm)
+      if (!cookie) return res.status(424).json({ error: `no secret for ${farm}` })
+      // plugmatic's install takes {plugin: <short>, version}; plugman's update
+      // takes {plugin: <full>, version}. Send the shape each understands.
+      const short = shortName(full) || full.replace(/^wiki-(?:plugin|security)-/, '')
+      const endpoint = base === 'plugman' ? 'update' : 'install'
+      const body = base === 'plugman' ? { plugin: full, version } : { plugin: short, version }
+      const r = await remoteFetch(
+        `https://${farm}/plugin/${base}/${endpoint}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify(body) },
+        180000,
+      )
+      const text = await r.text()
+      return res.status(r.ok ? 200 : 502).json({ farm, remoteBase: base, remoteStatus: r.status, remoteBody: text })
+    } catch (e) {
+      return res.status(502).json({ farm, error: String(e.message || e) })
+    }
+  })
+
+  app.post(route('remote/uninstall'), admin, async function (req, res) {
+    const { farm } = req.body
+    const full = fullName(req.body.plugin)
+    if (!farm || !DOMAIN_RE.test(farm) || !full) return res.status(400).json({ error: 'invalid farm or plugin' })
+    try {
+      const base = await discover(farm)
+      if (base !== 'plugman') return res.status(501).json({ error: 'remote farm runs plugmatic, which cannot uninstall' })
+      const cookie = await remoteLogin(farm)
+      if (!cookie) return res.status(424).json({ error: `no secret for ${farm}` })
+      const r = await remoteFetch(
+        `https://${farm}/plugin/plugman/uninstall`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ plugin: full }) },
+        180000,
+      )
+      const text = await r.text()
+      return res.status(r.ok ? 200 : 502).json({ farm, remoteStatus: r.status, remoteBody: text })
+    } catch (e) {
+      return res.status(502).json({ farm, error: String(e.message || e) })
+    }
+  })
+
+  app.post(route('remote/restart'), admin, async function (req, res) {
+    const { farm } = req.body
+    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    try {
+      const base = await discover(farm)
+      const cookie = await remoteLogin(farm)
+      // Endpoint first: the remote's own restart (works on Docker via auto-restart).
+      if (cookie) {
+        try {
+          const r = await remoteFetch(`https://${farm}/plugin/${base}/restart`, { method: 'POST', headers: { Cookie: cookie } })
+          if (r.ok) return res.json({ farm, via: 'endpoint', remoteBase: base })
+        } catch (e) {
+          /* fall through to SSH */
+        }
+      }
+      // SSH fallback: a per-farm restart command in the secrets file.
+      const ssh = loadSecrets()[farm]?.restart_ssh
+      if (ssh) {
+        const child = spawn('sh', ['-c', ssh], { detached: true, stdio: 'ignore' })
+        child.unref()
+        return res.json({ farm, via: 'ssh' })
+      }
+      return res.status(424).json({ farm, error: 'restart failed via endpoint and no restart_ssh configured' })
+    } catch (e) {
+      return res.status(502).json({ farm, error: String(e.message || e) })
+    }
+  })
+
+  app.get(route('remote/ready'), admin, async function (req, res) {
+    const farm = req.query.farm
+    if (!farm || !DOMAIN_RE.test(farm)) return res.status(400).json({ error: 'invalid farm' })
+    try {
+      const r = await remoteFetch(`https://${farm}/system/factories.json`, {}, 8000)
+      return res.status(r.ok ? 200 : 503).json({ farm, ready: r.ok })
+    } catch (e) {
+      return res.status(504).json({ farm, ready: false, error: String(e.message || e) })
+    }
   })
 
   // Restart. plugmatic's process.exit(0) relies on a supervisor to bring the
