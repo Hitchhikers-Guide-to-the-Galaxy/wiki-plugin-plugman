@@ -15,9 +15,25 @@ import { glob } from 'glob'
 import * as asyncLib from 'async'
 import jsonfile from 'jsonfile'
 import https from 'node:https'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 
 const PACKAGE_RE = /^wiki-(?:plugin|security)-[\w-]+$/
+
+// Accept either a short name (pod) or a full package (wiki-plugin-pod,
+// wiki-security-hitchhiker) and return the full package name, or null if the
+// input is not a valid plugin/security package reference.
+const fullName = function (name) {
+  if (typeof name !== 'string') return null
+  const full = /^wiki-(?:plugin|security)-/.test(name) ? name : `wiki-plugin-${name}`
+  return PACKAGE_RE.test(full) ? full : null
+}
+
+// The short name a package registers its client under (its seat name), or null
+// for wiki-security-* modules, which ship no browser client.
+const shortName = function (full) {
+  const m = full.match(/^wiki-plugin-([\w-]+)$/)
+  return m ? m[1] : null
+}
 
 // wiki-server serves a plugin purely by its directory name in node_modules —
 // the directory is a seat, and this package may occupy either its own seat
@@ -66,6 +82,15 @@ const startServer = function (params) {
         data: JSON.parse(data || '{"dependencies":{}}'),
       }),
   )
+
+  const ownVersion = (() => {
+    try {
+      const dir = nodePath.resolve(nodePath.dirname(fileURLToPath(import.meta.url)), '..')
+      return JSON.parse(fs.readFileSync(`${dir}/package.json`, 'utf8')).version
+    } catch (e) {
+      return null
+    }
+  })()
 
   const seat = seatOf()
   // Answer on the sibling prefix too, but only when that plugin is not itself
@@ -285,8 +310,103 @@ const startServer = function (params) {
     }
   })
 
+  // Cheap liveness probe — used by the client to know the server is back after
+  // a restart, and by remote farms for discovery.
+  // pid lets a client tell the freshly-restarted process apart from the old
+  // one, which can keep answering during the kill-wait window of a restart.
+  app.get(route('ready'), (req, res) => res.json({ name: 'plugman', seat, version: ownVersion, pid: process.pid }))
+
+  // Per-plugin status, driving the Update All progress loop. installed comes
+  // from the module's own package.json; published from npm (slow); symlinked
+  // and clientOk from the filesystem.
+  app.get(route('status/:pkg'), function (req, res) {
+    const full = fullName(req.params.pkg)
+    if (!full) {
+      return res.status(400).json({ error: 'invalid plugin name' })
+    }
+    const dir = `${argv.packageDir}/${full}`
+    const short = shortName(full)
+    const payload = { name: full, installed: null, published: null, symlinked: false }
+    try {
+      payload.symlinked = fs.lstatSync(dir).isSymbolicLink()
+    } catch (e) {
+      /* not installed */
+    }
+    try {
+      payload.installed = JSON.parse(fs.readFileSync(`${dir}/package.json`, 'utf8')).version
+    } catch (e) {
+      /* not installed */
+    }
+    // clientOk: only meaningful for wiki-plugin-* (security modules ship no client)
+    payload.clientOk = short == null ? 'n/a' : fs.existsSync(`${dir}/client/${short}.js`)
+    return execFile('npm', ['view', full, 'version', '--json'], { timeout: 30000 }, function (err, stdout) {
+      try {
+        const parsed = JSON.parse(stdout)
+        // `npm view` on an unpublished package returns an {error:{code:E404}}
+        // object rather than a version string — treat that as "not published".
+        payload.published = parsed && typeof parsed === 'object' && parsed.error ? null : parsed
+      } catch (e) {
+        payload.published = null
+      }
+      return res.json(payload)
+    })
+  })
+
+  // Update (or install) one plugin to a version, latest by default. Unlike
+  // plugmatic's install this validates and ALWAYS responds, refuses to clobber
+  // a dev symlink, and bounds npm with a timeout.
+  app.post(route('update'), admin, function (req, res) {
+    const full = fullName(req.body.plugin)
+    const version = req.body.version || 'latest'
+    if (!full || !/^[\w.-]+$/.test(version)) {
+      return res.status(400).json({ error: 'invalid plugin name or version' })
+    }
+    const dir = `${argv.packageDir}/${full}`
+    try {
+      if (fs.lstatSync(dir).isSymbolicLink()) {
+        return res.status(409).json({ error: 'plugin is a dev symlink; update skipped', name: full })
+      }
+    } catch (e) {
+      /* not yet installed — install is fine */
+    }
+    const pkg = `${full}@${version}`
+    console.log(`${seat} updating ${pkg}`)
+    return execFile(
+      'npm',
+      ['install', pkg, '--json'],
+      { cwd: argv.packageDir + '/..', timeout: 180000 },
+      function (err, stdout, stderr) {
+        let npm
+        try {
+          npm = JSON.parse(stdout)
+        } catch (error) {
+          /* ignore parse errors */
+        }
+        if (err) {
+          const code = err.killed || err.signal === 'SIGTERM' ? 504 : 400
+          return res.status(code).json({ error: 'server unable to update plugin', name: full, npm, stderr })
+        }
+        return info(full, (err, row) => res.json({ name: full, installed: version, npm, stderr, row }))
+      },
+    )
+  })
+
+  // Restart. plugmatic's process.exit(0) relies on a supervisor to bring the
+  // process back — true on Docker (cafe) and systemd (pi5) but NOT on a bare
+  // laptop farm, where it would just kill the farm. So prefer a configured
+  // restart command (argv.plugman_restart / PLUGMAN_RESTART) that relaunches
+  // the farm itself, and fall back to exit(0) where a supervisor exists.
   return app.post(route('restart'), admin, function (req, res) {
-    console.log(`${seat} exit to restart`)
+    const cmd = argv.plugman_restart || process.env.PLUGMAN_RESTART
+    if (cmd) {
+      console.log(`${seat} restart via configured command: ${cmd}`)
+      res.sendStatus(200)
+      // Detached so it outlives the process it is about to restart.
+      const child = spawn('sh', ['-c', cmd], { detached: true, stdio: 'ignore' })
+      child.unref()
+      return
+    }
+    console.log(`${seat} exit to restart (relying on supervisor)`)
     res.sendStatus(200)
     return process.exit(0)
   })

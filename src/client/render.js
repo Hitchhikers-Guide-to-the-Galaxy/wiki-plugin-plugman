@@ -1,4 +1,5 @@
 import { NAME } from './name.js'
+import { wireUpdateAll } from './update.js'
 
 const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -66,7 +67,7 @@ export const render = function (data, $item, markup) {
       return traffic(installed, published)
     }
 
-    const result = [`<tr class=row data-name=${plugin.plugin}>`]
+    const result = [`<tr class=row data-name="${plugin.plugin}">`]
     for (column of markup.columns) {
       result.push(
         (() => {
@@ -91,6 +92,8 @@ export const render = function (data, $item, markup) {
         })(),
       )
     }
+    // trailing cell the Update All loop writes per-row progress into
+    result.push(`<td class=state title=state style='font-size:85%; color:#666;'>`)
     return result.join('\n')
   }
 
@@ -110,6 +113,7 @@ export const render = function (data, $item, markup) {
       for (column of markup.columns) {
         result1.push(`<td style='font-size:75%; color:gray;'>${column}`)
       }
+      result1.push(`<td style='font-size:75%; color:gray;'>`)
       return result1
     })().join('\n')
     const result = (() => {
@@ -123,7 +127,9 @@ export const render = function (data, $item, markup) {
     return `<center> \
 <p><img src="/favicon.png" width=16> <span style="color:gray;">${window.location.host}</span></p> \
 <table style="width:100%;"><tr> ${head} ${result}</table> \
+<button class=update-all>Update All Plugins</button> \
 <button class=restart>restart</button> \
+<div class=plugman-status style="font-size:85%; color:#666; margin-top:6px;"></div> \
 </center>`
   }
 
@@ -285,15 +291,8 @@ export const render = function (data, $item, markup) {
     column = $(e.target).attr('title')
     return showdetail(e)
   })
-  $item
-    .find('button.restart')
-    .hide()
-    .on('click', event => {
-      $item.find('button.restart').attr('disabled', 'disabled')
-      try {
-        fetch(`/plugin/${NAME}/restart`, { method: 'POST' })
-      } catch (err) {
-        $item.find('p').html('server error')
-      }
-    })
+  // The Update All / Restart buttons and their readiness polling live in
+  // update.js; it owns both button click handlers (with a countdown), so the
+  // status-light install dialog only needs to reveal the restart button.
+  wireUpdateAll($item)
 }
