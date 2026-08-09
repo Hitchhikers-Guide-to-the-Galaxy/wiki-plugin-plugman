@@ -83,6 +83,21 @@
   },
   {
    "type": "markdown",
+   "id": "de8a0565948198d8",
+   "text": "# Sections"
+  },
+  {
+   "type": "paragraph",
+   "id": "0315a858ae8a6314",
+   "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
+  },
+  {
+   "type": "paragraph",
+   "id": "c20e6bf9f5636ddd",
+   "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
+  },
+  {
+   "type": "markdown",
    "id": "69d2b6f107f29fe6",
    "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
   },
@@ -217,6 +232,36 @@
     "type": "markdown",
     "id": "07603616475c51ea",
     "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
+   }
+  },
+  {
+   "type": "add",
+   "id": "de8a0565948198d8",
+   "date": 1786308144311,
+   "item": {
+    "type": "markdown",
+    "id": "de8a0565948198d8",
+    "text": "# Sections"
+   }
+  },
+  {
+   "type": "add",
+   "id": "0315a858ae8a6314",
+   "date": 1786308144311,
+   "item": {
+    "type": "paragraph",
+    "id": "0315a858ae8a6314",
+    "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
+   }
+  },
+  {
+   "type": "add",
+   "id": "c20e6bf9f5636ddd",
+   "date": 1786308144311,
+   "item": {
+    "type": "paragraph",
+    "id": "c20e6bf9f5636ddd",
+    "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
    }
   }
  ],

@@ -89,7 +89,7 @@ describe('plugman plugin', function () {
     })
   })
 
-  return describe('farms', function () {
+  describe('farms', function () {
     it('scopes plugins under a FARM line to that farm', function () {
       const result = plugman.parse('wiki-plugin-pod\nFARM example.earth\nwiki-plugin-farm')
       expect(result.plugins).to.eql(['wiki-plugin-pod'])
@@ -102,6 +102,33 @@ describe('plugman plugin', function () {
       const result = plugman.parse('FARM a.earth\nwiki-plugin-x\nFARM b.fish\nwiki-plugin-y')
       expect(result.farms.map(f => f.domain)).to.eql(['a.earth', 'b.fish'])
       return expect(result.farms[1].plugins).to.eql(['wiki-plugin-y'])
+    })
+  })
+
+  return describe('sections', function () {
+    it('marks plugins under PRIVATE as private (and still local)', function () {
+      const result = plugman.parse('wiki-plugin-pod\nPRIVATE\nwiki-plugin-gatekeeper')
+      expect(result.plugins).to.eql(['wiki-plugin-pod', 'wiki-plugin-gatekeeper'])
+      return expect(result.private).to.eql(['wiki-plugin-gatekeeper'])
+    })
+
+    it('LOCAL ends a PRIVATE scope', function () {
+      const result = plugman.parse('PRIVATE\nwiki-plugin-a\nLOCAL\nwiki-plugin-b')
+      return expect(result.private).to.eql(['wiki-plugin-a'])
+    })
+
+    it('a FARM line also ends a PRIVATE scope', function () {
+      const result = plugman.parse('PRIVATE\nwiki-plugin-a\nFARM x.earth\nwiki-plugin-b')
+      expect(result.private).to.eql(['wiki-plugin-a'])
+      return expect(result.farms[0].plugins).to.eql(['wiki-plugin-b'])
+    })
+
+    it('recognizes a SYNC feature with an optional target', function () {
+      const bare = plugman.parse('SYNC')
+      expect(bare.features).to.contain('sync')
+      expect(bare.sync).to.eql({ target: null })
+      const targeted = plugman.parse('SYNC hitchhikers.earth')
+      return expect(targeted.sync).to.eql({ target: 'hitchhikers.earth' })
     })
   })
 })

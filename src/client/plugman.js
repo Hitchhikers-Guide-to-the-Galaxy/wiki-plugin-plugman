@@ -15,17 +15,36 @@ import { renderFarms } from './farms.js'
 import { injectStyle } from './style.js'
 
 const parse = function (text) {
-  const result = { columns: [], plugins: [], features: [], farms: [] }
+  const result = { columns: [], plugins: [], features: [], farms: [], private: [], sync: null }
   const lines = (text || '').split(/\n+/)
-  // `FARM <domain>` scopes the plugin lines that follow it to that remote farm,
-  // until the next FARM line. Plugin lines before any FARM belong to the local
-  // server (result.plugins).
+  // Section headers scope the plugin lines that follow them:
+  //   FARM <domain>  → a remote farm (result.farms)
+  //   PRIVATE        → local, but marked private/localhost-only (result.private)
+  //   LOCAL / PUBLIC → back to the ordinary local scope
+  // Plugin lines before any header belong to the local server (result.plugins).
   let currentFarm = null
+  let privateScope = false
   for (var line of lines) {
     var m
     if ((m = line.match(/^FARM\s+([a-z0-9.-]+)\s*$/i))) {
       currentFarm = { domain: m[1], plugins: [] }
       result.farms.push(currentFarm)
+      privateScope = false
+      continue
+    }
+    if (line.match(/^PRIVATE\s*$/i)) {
+      currentFarm = null
+      privateScope = true
+      continue
+    }
+    if (line.match(/^(LOCAL|PUBLIC)\s*$/i)) {
+      currentFarm = null
+      privateScope = false
+      continue
+    }
+    if ((m = line.match(/^SYNC(?:\s+([a-z0-9.-]+))?\s*$/i))) {
+      result.features.push('sync')
+      result.sync = { target: m[1] || null }
       continue
     }
     if (line.match(/\bSTATUS\b/)) {
@@ -62,7 +81,10 @@ const parse = function (text) {
     // full package name; the renderer strips the prefix for display.
     if ((m = line.match(/^(wiki-(?:plugin|security)-[\w-]+)$/))) {
       if (currentFarm) currentFarm.plugins.push(m[1])
-      else result.plugins.push(m[1])
+      else {
+        result.plugins.push(m[1])
+        if (privateScope) result.private.push(m[1])
+      }
     }
   }
   if (result.columns.length === 0) {

@@ -56,8 +56,21 @@ export const render = function (data, $item, markup) {
           switch (column) {
             case 'status':
               return `<td title=status class="plugman-cell-status plugman-light ${lightClass()}">◉`
-            case 'name':
-              return `<td title=name> ${short}`
+            case 'name': {
+              // Only the noteworthy states get a badge — on a dev laptop almost
+              // every row is a symlink, so a bare "dev" badge is pure noise. What
+              // matters is 🔒 private and "unpublished" (a dev build with no npm
+              // release — the Not-Published set).
+              const badges = []
+              if (markup.private && markup.private.includes(name)) {
+                badges.push('<span class="plugman-badge plugman-badge-private">🔒 private</span>')
+              }
+              const published = pub(name)?.npm?.version
+              if (plugin.symlinked && data.publish && !published) {
+                badges.push('<span class="plugman-badge plugman-badge-unpublished">unpublished</span>')
+              }
+              return `<td title=name> ${short}${badges.join('')}`
+            }
             case 'menu':
               return `<td title=menu> ${(plugin.factory != null ? plugin.factory.category : undefined) || ''}`
             case 'pages':

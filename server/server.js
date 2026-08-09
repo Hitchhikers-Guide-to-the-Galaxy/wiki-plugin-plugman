@@ -148,6 +148,13 @@ const startServer = function (params) {
         site.authors = authors
         return cb()
       })
+    // A symlinked module dir means a live dev checkout (wiki-plugin-mode dev).
+    // Cheap and synchronous; the table shows a "dev" badge from it.
+    try {
+      site.symlinked = fs.lstatSync(path(file)).isSymbolicLink()
+    } catch (e) {
+      site.symlinked = false
+    }
     return asyncLib.series([birth, authors, packagejson, factory, pages], err => done(null, site))
   }
 
@@ -424,6 +431,79 @@ const startServer = function (params) {
     })
   })
 
+  // Classify the whole local plugin set in one call: installed version, npm
+  // published version, dev-symlink, private, and a derived source. Admin-gated
+  // (it spawns npm and exposes dev/unpublished internal state). npm lookups are
+  // batched (mapLimit) and TTL-cached; ?refresh=1 busts the cache.
+  const publishedCache = new Map() // full name → { version, at }
+  const PUB_TTL = 10 * 60 * 1000
+  const publishedVersion = function (full, fresh, done) {
+    const hit = publishedCache.get(full)
+    if (!fresh && hit && Date.now() - hit.at < PUB_TTL) return done(hit.version)
+    return execFile('npm', ['view', full, 'version', '--json'], { timeout: 30000 }, function (err, stdout) {
+      let version = null
+      try {
+        const parsed = JSON.parse(stdout)
+        version = parsed && typeof parsed === 'object' && parsed.error ? null : parsed
+      } catch (e) {
+        version = null
+      }
+      publishedCache.set(full, { version, at: Date.now() })
+      return done(version)
+    })
+  }
+
+  app.get(route('catalog'), admin, function (req, res) {
+    const fresh = req.query.refresh === '1'
+    const priv = new Set(loadPrivate())
+    glob('wiki-{plugin,security}-*', { cwd: argv.packageDir })
+      .then(files => {
+        const dirs = (files || []).filter(f => f !== ownPackage || true) // keep self; it's informative
+        asyncLib.mapLimit(
+          dirs,
+          5,
+          function (full, cb) {
+            const dir = `${argv.packageDir}/${full}`
+            // Display short — unlike shortName(), keep a label for security
+            // modules too (they have no client seat but still need a name).
+            const short = full.replace(/^wiki-(?:plugin|security)-/, '')
+            let installed = null
+            let symlinked = false
+            try {
+              symlinked = fs.lstatSync(dir).isSymbolicLink()
+            } catch (e) {
+              /* ignore */
+            }
+            try {
+              installed = JSON.parse(fs.readFileSync(`${dir}/package.json`, 'utf8')).version
+            } catch (e) {
+              /* ignore */
+            }
+            publishedVersion(full, fresh, function (published) {
+              const bundled = bundle?.data?.dependencies?.[full] != null
+              const source = symlinked ? 'dev' : published != null ? 'npm' : bundled ? 'bundled' : 'unknown'
+              cb(null, {
+                name: full,
+                short,
+                installed,
+                published,
+                symlinked,
+                private: priv.has(full),
+                unpublished: !!(symlinked && published == null),
+                source,
+              })
+            })
+          },
+          function (err, plugins) {
+            if (err) return res.status(500).json({ error: 'catalog failed' })
+            plugins.sort((a, b) => a.name.localeCompare(b.name))
+            return res.json({ host: req.headers.host, seat, version: ownVersion, generated: Date.now(), plugins })
+          },
+        )
+      })
+      .catch(() => res.status(500).json({ error: 'catalog failed' }))
+  })
+
   // Update (or install) one plugin to a version, latest by default. Unlike
   // plugmatic's install this validates and ALWAYS responds, refuses to clobber
   // a dev symlink, and bounds npm with a timeout.
@@ -481,6 +561,20 @@ const startServer = function (params) {
       return JSON.parse(fs.readFileSync(file, 'utf8'))
     } catch (e) {
       return {}
+    }
+  }
+
+  // Machine-level default private set — a plain name list. This is only the
+  // fallback: the authoritative marking is the PRIVATE section in a PlugMan
+  // item's text, which the sync/ghost builder unions with this. Missing file =
+  // no machine defaults, which is fine.
+  const loadPrivate = function () {
+    const file = argv.plugman_private || process.env.PLUGMAN_PRIVATE || `${process.env.HOME}/.wiki-plugman/private.json`
+    try {
+      const j = JSON.parse(fs.readFileSync(file, 'utf8'))
+      return Array.isArray(j) ? j : j.private || []
+    } catch (e) {
+      return []
     }
   }
   const remoteCache = {} // domain → { base, cookie }
@@ -646,6 +740,22 @@ const startServer = function (params) {
       return res.status(r.ok ? 200 : 503).json({ farm, ready: r.ok })
     } catch (e) {
       return res.status(504).json({ farm, ready: false, error: String(e.message || e) })
+    }
+  })
+
+  // Enumerate a remote farm's installed plugin NAMES (no versions, no npm).
+  // Open: it only relays the already-public /system/plugins.json array. This is
+  // the source the sync/merge panel reads to compare a server against others.
+  app.get(route('remote/catalog'), async function (req, res) {
+    const farm = req.query.farm
+    if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
+    try {
+      const r = await remoteFetch(`https://${farm}/system/plugins.json`, {}, 12000)
+      if (!r.ok) return res.status(502).json({ farm, reachable: false, error: `HTTP ${r.status}` })
+      const plugins = await r.json()
+      return res.json({ farm, reachable: true, plugins: Array.isArray(plugins) ? plugins : [] })
+    } catch (e) {
+      return res.status(502).json({ farm, reachable: false, error: String(e.message || e) })
     }
   })
 
