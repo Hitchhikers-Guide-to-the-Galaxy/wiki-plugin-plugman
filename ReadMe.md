@@ -34,12 +34,16 @@ any farm that other people can reach.
   false, so every mutating route returns 403 — PlugMan is inventory-only until a
   security module and an admin secret are configured. Ordinary farm members
   (non-admins) can never install, uninstall, or restart.
-- **Admin-gated:** `install`, `update`, `uninstall`, `restart`, all `remote/*`,
-  and the npm-spawning `view`/`status` reads.
+- **Admin-gated (writes + npm-spawning):** `install`, `update`, `uninstall`,
+  `restart`, `remote/install`, `remote/uninstall`, `remote/restart`, and the
+  npm-spawning `view`/`status` reads.
 - **Unauthenticated (read-only):** `plugins`, `sitemap.json`, `page/:slug.json`,
-  `file/.../slug/...`, `ready`. These reveal the installed plugin inventory and
-  versions — fingerprinting information. Do not expose an admin-configured farm
-  to untrusted networks without a reverse proxy / rate limiting in front.
+  `file/.../slug/...`, `ready`, and the remote **reads** `remote/status` /
+  `remote/ready` (which only proxy information the remote already serves
+  publicly, bounded by the loopback/link-local guard and a timeout). These
+  reveal the installed plugin inventory and versions — fingerprinting
+  information. Do not expose an admin-configured farm to untrusted networks
+  without a reverse proxy / rate limiting in front.
 - **Remote farms** are reached only by an admin, secrets live in
   `~/.wiki-plugman/secrets.json` (**you must `chmod 600` it**), are scoped per
   domain, and are never returned in a response. Loopback and link-local targets

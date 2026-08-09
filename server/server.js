@@ -543,7 +543,9 @@ const startServer = function (params) {
     }
   }
 
-  app.get(route('remote/status'), admin, async function (req, res) {
+  // Read-only: proxies information the remote already serves publicly, so it
+  // is open (bounded by badFarm + timeout). The write actions below stay admin.
+  app.get(route('remote/status'), async function (req, res) {
     const farm = req.query.farm
     if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
@@ -636,7 +638,7 @@ const startServer = function (params) {
     }
   })
 
-  app.get(route('remote/ready'), admin, async function (req, res) {
+  app.get(route('remote/ready'), async function (req, res) {
     const farm = req.query.farm
     if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
