@@ -16,6 +16,9 @@ import * as asyncLib from 'async'
 import jsonfile from 'jsonfile'
 import https from 'node:https'
 import { execFile, spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+
+const hexId = () => randomBytes(8).toString('hex')
 
 const PACKAGE_RE = /^wiki-(?:plugin|security)-[\w-]+$/
 
@@ -740,6 +743,66 @@ const startServer = function (params) {
       return res.status(r.ok ? 200 : 503).json({ farm, ready: r.ok })
     } catch (e) {
       return res.status(504).json({ farm, ready: false, error: String(e.message || e) })
+    }
+  })
+
+  // Build a merged plugin-list ghost page (title + story) from one or more
+  // sources, for html-form / bookmark interop. The client sync panel assembles
+  // the same page in-browser and does not need this. Open: it emits only names,
+  // and reads private.json solely to SUBTRACT for a public target, never to
+  // reveal. Invariant: ALWAYS 200 page JSON — a non-200 from an html-form ghost
+  // is a silently dead button.
+  app.get(route('ghost'), async function (req, res) {
+    try {
+      const target = (req.query.target || 'localhost').toString()
+      const isPublic = target !== 'localhost'
+      const sources = (req.query.source || 'laptop')
+        .toString()
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+      const names = new Set()
+      for (const src of sources) {
+        if (src === 'laptop') {
+          const files = await glob('wiki-{plugin,security}-*', { cwd: argv.packageDir })
+          ;(files || []).forEach(f => names.add(f))
+        } else if (src.startsWith('farm:')) {
+          const farm = src.slice(5)
+          if (!badFarm(farm)) {
+            try {
+              const r = await remoteFetch(`https://${farm}/system/plugins.json`, {}, 12000)
+              if (r.ok) {
+                const arr = await r.json()
+                ;(Array.isArray(arr) ? arr : []).forEach(n => names.add(n))
+              }
+            } catch (e) {
+              /* skip an unreachable farm */
+            }
+          }
+        }
+      }
+      let list = [...names]
+      if (isPublic) {
+        const priv = new Set(loadPrivate())
+        list = list.filter(n => !priv.has(n))
+      }
+      list.sort()
+      return res.json({
+        title: `Plugins for ${target}`,
+        story: [
+          {
+            type: 'paragraph',
+            id: hexId(),
+            text: `Merged plugin list for ${target}. Prune the lines you do not want, then fork to save it as the roster.`,
+          },
+          { type: 'plugman', id: hexId(), text: `STATUS NAME INSTALLED PUBLISHED\n${list.join('\n')}` },
+        ],
+      })
+    } catch (e) {
+      return res.json({
+        title: 'PlugMan Ghost',
+        story: [{ type: 'paragraph', id: hexId(), text: `Could not build the list: ${String(e.message || e)}` }],
+      })
     }
   })
 

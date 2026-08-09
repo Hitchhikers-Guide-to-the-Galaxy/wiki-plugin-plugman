@@ -98,6 +98,16 @@
   },
   {
    "type": "markdown",
+   "id": "aa885e328893b9da",
+   "text": "# Sync"
+  },
+  {
+   "type": "paragraph",
+   "id": "80c77d6b524b1939",
+   "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
+  },
+  {
+   "type": "markdown",
    "id": "69d2b6f107f29fe6",
    "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
   },
@@ -262,6 +272,26 @@
     "type": "paragraph",
     "id": "c20e6bf9f5636ddd",
     "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
+   }
+  },
+  {
+   "type": "add",
+   "id": "aa885e328893b9da",
+   "date": 1786308690866,
+   "item": {
+    "type": "markdown",
+    "id": "aa885e328893b9da",
+    "text": "# Sync"
+   }
+  },
+  {
+   "type": "add",
+   "id": "80c77d6b524b1939",
+   "date": 1786308690866,
+   "item": {
+    "type": "paragraph",
+    "id": "80c77d6b524b1939",
+    "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
    }
   }
  ],

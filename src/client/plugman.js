@@ -12,6 +12,7 @@ import { NAME } from './name.js'
 import { render } from './render.js'
 import { browse } from './browse.js'
 import { renderFarms } from './farms.js'
+import { renderSync } from './sync.js'
 import { injectStyle } from './style.js'
 
 const parse = function (text) {
@@ -108,6 +109,18 @@ const emit = async function ($item, item) {
   const renderproxy = data => {
     if (markup.features.includes('browse')) browse(data, $item)
     else render(data, $item, markup)
+  }
+
+  // A SYNC item is a source-picker / merge panel — it draws neither the local
+  // table nor the per-farm status tables (it lists the farms as merge sources).
+  if (markup.features.includes('sync')) {
+    $item.find('p').remove()
+    try {
+      await renderSync($item, markup)
+    } catch (err) {
+      $item.append('<p style="color:#888;">could not load the sync panel</p>')
+    }
+    return
   }
 
   // A FARM-only item (no local plugin lines, no BROWSE) has no local table to

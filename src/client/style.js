@@ -73,6 +73,14 @@ const CSS = `
 .plugman-farm-head { margin:4px 0; }
 .plugman-farm-domain { color:gray; }
 .plugman-farm-note { font-size:85%; color:#888; }
+
+.plugman-sync { border:1px solid rgba(128,128,128,.25); border-radius:10px; padding:12px 14px; }
+.plugman-sync-title { margin:0 0 8px; font-weight:600; }
+.plugman-sync-sources { margin-bottom:10px; }
+.plugman-source-row { display:block; padding:2px 0; }
+.plugman-source-count { color:#888; font-size:85%; }
+.plugman-sync-target { margin-bottom:4px; }
+.plugman-sync-target select { font:inherit; margin-left:4px; padding:2px 4px; }
 `
 
 export function injectStyle() {
