@@ -2,7 +2,7 @@ import { NAME } from './name.js'
 
 // Write a short status string into a row's state cell.
 const setState = function ($item, name, text) {
-  $item.find(`table [data-name="${name}"] .state`).text(text)
+  $item.find(`table [data-name="${name}"] .plugman-state`).text(text)
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -53,8 +53,8 @@ const restartAndWait = async function ($status, budgetMs = 60000) {
 // check each status, update the stale ones, then restart once at the end and
 // wait for the server to return before reporting the summary.
 export const wireUpdateAll = function ($item) {
-  const $btn = $item.find('button.update-all')
-  const $restart = $item.find('button.restart')
+  const $btn = $item.find('button.plugman-update-all')
+  const $restart = $item.find('button.plugman-restart')
   const $status = $item.find('.plugman-status')
 
   $restart.on('click', () => {
@@ -63,10 +63,10 @@ export const wireUpdateAll = function ($item) {
   })
 
   $btn.on('click', async () => {
-    $btn.attr('disabled', 'disabled')
+    $btn.attr('disabled', 'disabled').addClass('is-busy')
     $restart.attr('disabled', 'disabled')
     const names = $item
-      .find('.row')
+      .find('.plugman-row')
       .map((i, el) => $(el).data('name'))
       .get()
     let updated = 0,
@@ -136,7 +136,7 @@ export const wireUpdateAll = function ($item) {
         $status.append(' Done.')
       }
     }
-    $btn.removeAttr('disabled')
+    $btn.removeAttr('disabled').removeClass('is-busy')
     $restart.removeAttr('disabled')
   })
 }

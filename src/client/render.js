@@ -1,5 +1,6 @@
 import { NAME } from './name.js'
 import { wireUpdateAll } from './update.js'
+import { injectStyle, trafficClass } from './style.js'
 
 const escape = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -30,71 +31,51 @@ const expand = function (string) {
     .replace(/"((http|https|ftp):.*?)"/gi, external)
   return escape(string).replace(/〖(\d+)〗/g, unstash)
 }
-const traffic = function (installed, published) {
-  const color = {
-    gray: '#ccc',
-    red: '#f55',
-    yellow: '#fb0',
-    green: '#0e0',
-  }
 
-  if (installed != null && published != null) {
-    if (installed === published) {
-      return color.green
-    } else {
-      return color.yellow
-    }
-  } else {
-    if (published != null) {
-      return color.red
-    } else {
-      return color.gray
-    }
-  }
-}
-
-var dialog
+const asArray = obj => (typeof obj === 'string' ? [obj] : obj || [])
+const shortOf = full => full.replace(/^wiki-(?:plugin|security)-/, '')
 
 export const render = function (data, $item, markup) {
+  injectStyle()
   let column = 'installed'
-  const pub = name => data.publish.find(obj => obj.plugin === name)
+  const pub = name => (data.publish ? data.publish.find(obj => obj.plugin === name) : undefined)
   const format = function (markup, plugin, dependencies) {
     const name = plugin.plugin // full package name — the row key
-    const short = plugin.short || name.replace(/^wiki-(?:plugin|security)-/, '') // display
+    const short = plugin.short || shortOf(name) // display
     const months = plugin.birth ? ((Date.now() - plugin.birth) / 1000 / 3600 / 24 / 31.5).toFixed(0) : ''
-    const status = function () {
+    const lightClass = function () {
       const installed = plugin.package != null ? plugin.package.version : undefined
-      const published = pub(name).npm?.version
-      return traffic(installed, published)
+      const published = pub(name)?.npm?.version
+      return trafficClass(installed, published)
     }
 
-    const result = [`<tr class=row data-name="${plugin.plugin}">`]
+    const result = [`<tr class="plugman-row" data-name="${name}">`]
     for (column of markup.columns) {
       result.push(
         (() => {
           switch (column) {
             case 'status':
-              return `<td title=status style='text-align:center; color: ${status()}'>◉`
+              return `<td title=status class="plugman-cell-status plugman-light ${lightClass()}">◉`
             case 'name':
               return `<td title=name> ${short}`
             case 'menu':
               return `<td title=menu> ${(plugin.factory != null ? plugin.factory.category : undefined) || ''}`
             case 'pages':
-              return `<td title=pages style='text-align:center;'>${(plugin.pages != null ? plugin.pages.length : undefined) || ''}`
+              return `<td title=pages class="plugman-cell-pages">${(plugin.pages != null ? plugin.pages.length : undefined) || ''}`
             case 'service':
-              return `<td title=service style='text-align:center;'>${months}`
+              return `<td title=service class="plugman-cell-service">${months}`
             case 'bundled':
               return `<td title=bundled> ${dependencies[name] || ''}`
             case 'installed':
               return `<td title=installed> ${(plugin.package != null ? plugin.package.version : undefined) || ''}`
             case 'published':
-              return `<td title=published> ${pub(name).npm?.version || ''}`
+              return `<td title=published> ${pub(name)?.npm?.version || ''}`
           }
         })(),
       )
     }
     // trailing cell the Update All loop writes per-row progress into
-    result.push(`<td class=state title=state style='font-size:85%; color:#666;'>`)
+    result.push(`<td class="plugman-state" title=state>`)
     return result.join('\n')
   }
 
@@ -112,9 +93,9 @@ export const render = function (data, $item, markup) {
     const head = (() => {
       const result1 = []
       for (column of markup.columns) {
-        result1.push(`<td style='font-size:75%; color:gray;'>${column}`)
+        result1.push(`<td>${column}`)
       }
-      result1.push(`<td style='font-size:75%; color:gray;'>`)
+      result1.push(`<td>`)
       return result1
     })().join('\n')
     const result = (() => {
@@ -127,99 +108,135 @@ export const render = function (data, $item, markup) {
     })().join('\n')
     return `<center> \
 <p><img src="/favicon.png" width=16> <span style="color:gray;">${window.location.host}</span></p> \
-<table style="width:100%;"><tr> ${head} ${result}</table> \
-<button class=update-all>Update All Plugins</button> \
-<button class=restart>restart</button> \
-<div class=plugman-status style="font-size:85%; color:#666; margin-top:6px;"></div> \
+<table class="plugman-table"><tr class="plugman-head"> ${head} </tr>${result}</table> \
+<div class="plugman-buttons"> \
+<button class="plugman-btn plugman-btn-primary plugman-update-all">Update All Plugins</button> \
+<button class="plugman-btn plugman-btn-secondary plugman-restart">restart</button> \
+</div> \
+<div class="plugman-status"></div> \
 </center>`
   }
 
-  const installer = function (row, npm) {
-    let version
-    if (npm == null) {
-      return `<p>can't find wiki-plugin-${row.plugin} in <a href=//npmjs.com target=_blank>npmjs.com</a></p>`
-    }
-    const $row = $item.find(`table [data-name="${row.plugin}"]`)
-    const installed = function (update) {
-      const index = data.install.indexOf(row)
-      data.install[index] = row = update.row
-      $row.find('[title=status]').css('color', traffic(update.installed, npm.version))
-      $row.find('[title=menu]').text((row.factory != null ? row.factory.category : undefined) || '')
-      $row.find('[title=pages]').text((row.pages != null ? row.pages.length : undefined) || '')
-      $row.find('[title=service]').text('0')
-      $row.find('[title=installed]').text((row.package != null ? row.package.version : undefined) || '')
-      $item.find('button.restart').removeAttr('disabled').show()
-    }
+  // The styled version dialog: click a traffic light to upgrade OR downgrade to
+  // any published version. One <dialog> instance per open, one delegated click
+  // listener closed over this row — so opening a second row can never clobber
+  // the first (the old inline-onclick + global-rebind design could only keep one
+  // row live at a time).
+  const openInstallDialog = function (row, npm) {
+    $item.find('dialog.plugman-dialog').remove()
+    const short = row.short || shortOf(row.plugin)
+    const installedVer = row.package != null ? row.package.version : null
 
-    window.plugins[NAME].install = async function (version) {
-      try {
-        const options = {
-          method: 'POST',
-          body: JSON.stringify({ version, plugin: row.plugin }),
-          headers: { 'Content-Type': 'application/json' },
-        }
-        const update = await fetch(`/plugin/${NAME}/install`, options).then(res => res.json())
-        installed(update)
-        $row.find('[title=status]').css('color', 'white')
-        dialog.close()
-      } catch (err) {
-        $item.find('p').html('server error')
+    let bodyHtml
+    if (npm == null) {
+      bodyHtml = `<p>${short} is not published on <a href="//npmjs.com" target="_blank" rel="nofollow">npmjs.com</a>.</p>`
+    } else {
+      const versions = asArray(npm.versions) // npm returns publish order, oldest → newest
+      const latest = npm.version
+      const idx = installedVer ? versions.indexOf(installedVer) : -1
+      const badge = v => (v === latest ? ' <span class="plugman-badge plugman-badge-latest">latest</span>' : '')
+      const vrow = v =>
+        `<div class="plugman-version-row"><span>${v}${badge(v)}</span>` +
+        `<button class="plugman-btn plugman-btn-ghost" data-version="${v}">install</button></div>`
+      const group = (label, list) =>
+        list.length ? `<div class="plugman-group-label">${label}</div>${list.map(vrow).join('')}` : ''
+      const currentRow = installedVer
+        ? `<div class="plugman-version-row plugman-version-current">` +
+          `<span>${installedVer} <span class="plugman-badge plugman-badge-installed">installed</span>${badge(installedVer)}</span>` +
+          `<button class="plugman-btn plugman-btn-secondary" data-action="uninstall">uninstall</button></div>`
+        : ''
+      if (idx >= 0) {
+        // Installed version is among the published set — split cleanly into
+        // versions above (upgrade) and below (downgrade), newest first.
+        const upgrades = versions.slice(idx + 1).reverse()
+        const downgrades = versions.slice(0, idx).reverse()
+        bodyHtml = group('upgrade', upgrades) + currentRow + group('downgrade', downgrades)
+      } else {
+        // Nothing installed, or the installed version is not published (e.g. a
+        // dev build ahead of npm) — one neutral list, newest first.
+        bodyHtml = currentRow + group('available', versions.slice().reverse())
       }
     }
 
-    window.plugins[NAME].uninstall = async function () {
+    const $dialog = $(`<dialog class="plugman-dialog">
+      <div class="plugman-dialog-head">
+        <button class="plugman-dialog-close" data-action="close" title="close">×</button>
+        <h3>${short}</h3>
+        <p class="plugman-dialog-desc">${npm ? escape(npm.description || '') : ''}</p>
+      </div>
+      <div class="plugman-dialog-body">${bodyHtml}</div>
+    </dialog>`)
+    $item.append($dialog)
+    const dialogEl = $dialog[0]
+    const $row = $item.find(`table [data-name="${row.plugin}"]`)
+    const published = npm ? npm.version : null
+
+    const paintLight = installed =>
+      $row
+        .find('[title=status]')
+        .removeClass(
+          'plugman-light-green plugman-light-yellow plugman-light-red plugman-light-gray plugman-light-white',
+        )
+        .addClass(trafficClass(installed, published))
+
+    const install = async function (version) {
+      try {
+        const update = await fetch(`/plugin/${NAME}/install`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version, plugin: row.plugin }),
+        }).then(res => res.json())
+        const i = data.install.indexOf(row)
+        if (i >= 0 && update.row) data.install[i] = update.row
+        const now = update.installed || version
+        paintLight(now)
+        $row.find('[title=installed]').text(now)
+        $item.find('button.plugman-restart').removeAttr('disabled').show()
+        $item.find('.plugman-status').text(`${short} set to ${now} — restart to apply.`)
+        dialogEl.close()
+      } catch (err) {
+        $item.find('.plugman-status').text('server error')
+      }
+    }
+
+    const uninstall = async function () {
       if (
         !window.confirm(
           `Uninstall ${row.plugin}?\n\nIf this plugin is on the server's roster it will be ` +
-            `reinstalled on the next restart. The server must be restarted for the ` +
-            `removal to take effect.`,
+            `reinstalled on the next restart. The server must be restarted for the removal to take effect.`,
         )
       ) {
         return
       }
       try {
-        const result = await fetch(`/plugin/${NAME}/uninstall`, {
+        const res = await fetch(`/plugin/${NAME}/uninstall`, {
           method: 'POST',
-          body: JSON.stringify({ plugin: row.plugin }),
           headers: { 'Content-Type': 'application/json' },
-        }).then(res => res.json().then(j => ({ ok: res.ok, j })))
-        if (result.ok) {
+          body: JSON.stringify({ plugin: row.plugin }),
+        }).then(r => r.json().then(j => ({ ok: r.ok, j })))
+        if (res.ok) {
+          paintLight(null)
           $row.find('[title=installed]').text('')
-          $row.find('[title=status]').css('color', '#ccc')
-          $item.find('button.restart').removeAttr('disabled').show()
+          $item.find('button.plugman-restart').removeAttr('disabled').show()
           $item.find('.plugman-status').text(`${row.plugin} removed — restart to apply.`)
         } else {
-          $item.find('.plugman-status').text(`uninstall failed: ${result.j.error || ''}`)
+          $item.find('.plugman-status').text(`uninstall failed: ${res.j.error || ''}`)
         }
-        dialog.close()
+        dialogEl.close()
       } catch (err) {
-        $item.find('p').html('server error')
+        $item.find('.plugman-status').text('server error')
       }
     }
 
-    const array = function (obj) {
-      if (typeof obj === 'string') {
-        return [obj]
-      } else {
-        return obj
-      }
-    }
-    const choice = function (version) {
-      const button = () => `<button onclick=window.plugins.${NAME}.install('${version}')> install </button>`
-      return `<tr> <td> ${version} <td> ${version === (row.package != null ? row.package.version : undefined) ? 'installed' : button()}`
-    }
-    const choices = (() => {
-      const result = []
-      for (version of array(npm.versions).reverse()) {
-        result.push(choice(version))
-      }
-      return result
-    })()
-    const uninstall =
-      row.package != null
-        ? `<p><button onclick=window.plugins.${NAME}.uninstall()> uninstall </button> ${row.plugin}</p>`
-        : ''
-    return `<h3>${npm.description}</h3>${uninstall}<p>Choose a version to install.</p> <table>${choices.join('\n')}`
+    dialogEl.addEventListener('click', function (e) {
+      if (e.target === dialogEl) return dialogEl.close() // click on the backdrop
+      const v = e.target.closest('[data-version]')
+      if (v) return install(v.getAttribute('data-version'))
+      if (e.target.closest('[data-action=uninstall]')) return uninstall()
+      if (e.target.closest('[data-action=close]')) return dialogEl.close()
+    })
+    dialogEl.addEventListener('close', () => $dialog.remove())
+    dialogEl.showModal()
   }
 
   const detail = function (name, done) {
@@ -247,7 +264,9 @@ export const render = function (data, $item, markup) {
     const npmjs = more => $.getJSON(`/plugin/${NAME}/view/${name}`, more)
     switch (column) {
       case 'status':
-        return npmjs(npm => done(installer(row, npm)))
+        // The status column owns the styled install dialog; it does not use the
+        // generic popup `done` path.
+        return npmjs(npm => openInstallDialog(row, npm))
       case 'name':
         return done(text(row.authors))
       case 'menu':
@@ -261,73 +280,43 @@ export const render = function (data, $item, markup) {
       case 'installed':
         return done(struct(row.package))
       case 'published':
-        return done(struct(pub(name).npm || ''))
+        return done(struct(pub(name)?.npm || ''))
       default:
         return done('unexpected column')
     }
   }
 
+  // Non-status columns open a detail popup window (unchanged). The status column
+  // is handled inside detail() by openInstallDialog and never reaches here.
   const showdetail = function (e) {
-    const $parent = $(e.target).parent()
+    const $parent = $(e.target).closest('[data-name]')
     const name = $parent.data('name')
     return detail(name, function (html) {
-      // console.log(column, name, $item, item)
-      if (column === 'status') {
-        // show dialog
-        $item.find('dialog').remove()
-        $item.append(`\
-<dialog>
-  ${html}
-</dialog>\
-`)
-        dialog = $item.find('dialog')[0]
-        console.log('dialog', dialog)
-        return dialog.showModal()
-      } else {
-        // wiki.dialog "#{name} plugin #{column}", html || ''
-        const pageKey = $item.parents('.page').data('key')
-        const context = wiki.lineup.atKey(pageKey).getContext()
-        const plugmanDialog = window.open(`/plugins/${NAME}/dialog/#`, NAME, 'popup,height=600,width=800')
-        if (plugmanDialog.location.pathname !== `/plugins/${NAME}/dialog/`) {
-          return plugmanDialog.addEventListener('load', event =>
-            plugmanDialog.postMessage(
-              { column, title: `${name} plugin ${column}`, body: html || '', pageKey, context },
-              window.origin,
-            ),
-          )
-        } else {
-          return plugmanDialog.postMessage(
+      const pageKey = $item.parents('.page').data('key')
+      const context = wiki.lineup.atKey(pageKey).getContext()
+      const plugmanDialog = window.open(`/plugins/${NAME}/dialog/#`, NAME, 'popup,height=600,width=800')
+      if (plugmanDialog.location.pathname !== `/plugins/${NAME}/dialog/`) {
+        return plugmanDialog.addEventListener('load', event =>
+          plugmanDialog.postMessage(
             { column, title: `${name} plugin ${column}`, body: html || '', pageKey, context },
             window.origin,
-          )
-        }
+          ),
+        )
+      } else {
+        return plugmanDialog.postMessage(
+          { column, title: `${name} plugin ${column}`, body: html || '', pageKey, context },
+          window.origin,
+        )
       }
     })
   }
 
-  const more = function (e) {
-    if (e.shiftKey) {
-      return showdetail(e)
-    }
-  }
-
-  const bright = function (e) {
-    more(e)
-    return $(e.currentTarget).css('background-color', '#f8f8f8')
-  }
-  const normal = e => $(e.currentTarget).css('background-color', '#eee')
-
   $item.find('p').html(report(markup, data.install, data.bundle.data.dependencies))
-  $item.find('.row').on({
-    mouseenter: bright,
-    mouseleave: normal,
-  })
   $item.find('p td').on('click', function (e) {
-    column = $(e.target).attr('title')
+    column = $(e.target).closest('td').attr('title')
     return showdetail(e)
   })
   // The Update All / Restart buttons and their readiness polling live in
-  // update.js; it owns both button click handlers (with a countdown), so the
-  // status-light install dialog only needs to reveal the restart button.
+  // update.js; it owns both button click handlers (with a countdown).
   wireUpdateAll($item)
 }

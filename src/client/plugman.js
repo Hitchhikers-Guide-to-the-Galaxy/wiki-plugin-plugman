@@ -12,6 +12,7 @@ import { NAME } from './name.js'
 import { render } from './render.js'
 import { browse } from './browse.js'
 import { renderFarms } from './farms.js'
+import { injectStyle } from './style.js'
 
 const parse = function (text) {
   const result = { columns: [], plugins: [], features: [], farms: [] }
@@ -74,6 +75,7 @@ const parse = function (text) {
 }
 
 const emit = async function ($item, item) {
+  injectStyle()
   const markup = parse(item.text)
   $item.append(`\
 <p style="background-color:#eee;padding:15px;">

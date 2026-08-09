@@ -1,15 +1,11 @@
 import { NAME } from './name.js'
-
-const trafficColor = function (installed, published) {
-  if (installed != null && published != null) return installed === published ? '#0e0' : '#fb0'
-  if (published != null) return '#f55'
-  return '#ccc'
-}
+import { trafficClass } from './style.js'
 
 const short = full => full.replace(/^wiki-(?:plugin|security)-/, '')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-const setFarmState = ($section, full, text) => $section.find(`tr.farm-row[data-name="${full}"] .fstate`).text(text)
+const setFarmState = ($section, full, text) =>
+  $section.find(`tr.plugman-farm-row[data-name="${full}"] .plugman-fstate`).text(text)
 
 // Fetch one plugin's remote status through the local proxy.
 const remoteStatus = async function (domain, full) {
@@ -27,8 +23,8 @@ const remoteStatus = async function (domain, full) {
 // through the local server's admin-guarded proxy; each remote write needs a
 // secret for the farm in ~/.wiki-plugman/secrets.json (a row shows 424 if none).
 const installAll = async function (domain, farm, $section) {
-  const $btn = $section.find('button.farm-install')
-  const $status = $section.find('.farm-status')
+  const $btn = $section.find('button.plugman-farm-install')
+  const $status = $section.find('.plugman-farm-status')
   $btn.attr('disabled', 'disabled')
   let installed = 0,
     upToDate = 0,
@@ -109,16 +105,16 @@ export const renderFarms = async function ($item, farms) {
   for (const farm of farms) {
     const domain = farm.domain
     const $section = $(`
-      <div class="plugman-farm" style="margin-top:14px;">
-        <p style="margin:4px 0;"><b>FARM</b> <span class="farm-domain" style="color:gray;">${domain}</span>
-          <span class="farm-note" style="font-size:85%; color:#888;"> — checking…</span></p>
-        <table style="width:100%;"><tr>
-          <td style='font-size:75%;color:gray;'>status<td style='font-size:75%;color:gray;'>name
-          <td style='font-size:75%;color:gray;'>installed<td style='font-size:75%;color:gray;'>published
-          <td style='font-size:75%;color:gray;'>
+      <div class="plugman-farm">
+        <p class="plugman-farm-head"><b>FARM</b> <span class="plugman-farm-domain">${domain}</span>
+          <span class="plugman-farm-note"> — checking…</span></p>
+        <table class="plugman-table"><tr class="plugman-head">
+          <td>status<td>name<td>installed<td>published<td>
         </tr></table>
-        <button class="farm-install">Install / Update All on this farm</button>
-        <div class="farm-status" style="font-size:85%; color:#666; margin-top:6px;"></div>
+        <div class="plugman-buttons">
+          <button class="plugman-btn plugman-btn-primary plugman-farm-install">Install / Update All on this farm</button>
+        </div>
+        <div class="plugman-farm-status"></div>
       </div>`)
     $item.append($section)
     const $table = $section.find('table')
@@ -128,24 +124,24 @@ export const renderFarms = async function ($item, farms) {
       const disc = await fetch(`/plugin/${NAME}/remote/status?farm=${encodeURIComponent(domain)}`).then(r => r.json())
       reachable = disc.reachable
       $section
-        .find('.farm-note')
+        .find('.plugman-farm-note')
         .text(reachable ? ` — ${disc.remoteBase}${disc.hasSecret ? ', authenticated' : ', no secret yet'}` : ' — unreachable')
     } catch (err) {
-      $section.find('.farm-note').text(' — unreachable')
+      $section.find('.plugman-farm-note').text(' — unreachable')
     }
     if (!reachable) {
-      $section.find('button.farm-install').attr('disabled', 'disabled')
+      $section.find('button.plugman-farm-install').attr('disabled', 'disabled')
       continue
     }
 
     for (const full of farm.plugins) {
       const st = await remoteStatus(domain, full)
-      $table.append(`<tr class="farm-row" data-name="${full}">
-        <td style="text-align:center; color:${trafficColor(st.installed, st.published)}">◉
+      $table.append(`<tr class="plugman-farm-row" data-name="${full}">
+        <td class="plugman-cell-status plugman-light ${trafficClass(st.installed, st.published)}">◉
         <td>${short(full)}<td>${st.installed || ''}<td>${st.published || ''}
-        <td class="fstate" style="font-size:85%; color:#666;"></tr>`)
+        <td class="plugman-fstate"></tr>`)
     }
 
-    $section.find('button.farm-install').on('click', () => installAll(domain, farm, $section))
+    $section.find('button.plugman-farm-install').on('click', () => installAll(domain, farm, $section))
   }
 }
