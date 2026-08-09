@@ -85,6 +85,16 @@
    "type": "markdown",
    "id": "69d2b6f107f29fe6",
    "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
+  },
+  {
+   "type": "markdown",
+   "id": "b97294e60a0ef05d",
+   "text": "## Security"
+  },
+  {
+   "type": "markdown",
+   "id": "07603616475c51ea",
+   "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
   }
  ],
  "journal": [
@@ -187,6 +197,26 @@
     "type": "markdown",
     "id": "69d2b6f107f29fe6",
     "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
+   }
+  },
+  {
+   "type": "add",
+   "id": "b97294e60a0ef05d",
+   "date": 1786300248279,
+   "item": {
+    "type": "markdown",
+    "id": "b97294e60a0ef05d",
+    "text": "## Security"
+   }
+  },
+  {
+   "type": "add",
+   "id": "07603616475c51ea",
+   "date": 1786300248279,
+   "item": {
+    "type": "markdown",
+    "id": "07603616475c51ea",
+    "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
    }
   }
  ],
