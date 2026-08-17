@@ -72,6 +72,15 @@ const github = function (path, done) {
 
 // http://www.sebastianseilund.com/nodejs-async-in-practice
 
+const safeParse = (text, fallback) => {
+  try {
+    return JSON.parse(text || JSON.stringify(fallback))
+  } catch (e) {
+    console.log(`plugmatic: could not parse upstream package.json (${String(text).slice(0, 40)}...) — using empty bundle`)
+    return fallback
+  }
+}
+
 const startServer = function (params) {
   const { app } = params
   const { argv } = params
@@ -82,7 +91,9 @@ const startServer = function (params) {
     data =>
       (bundle = {
         date: Date.now(),
-        data: JSON.parse(data || '{"dependencies":{}}'),
+        // a rate-limited or offline GitHub answers with text, not JSON —
+        // never let that take the whole farm down
+        data: safeParse(data, { dependencies: {} }),
       }),
   )
 
