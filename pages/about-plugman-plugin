@@ -1,299 +1,333 @@
 {
- "title": "About PlugMan Plugin",
- "story": [
-  {
-   "type": "paragraph",
-   "id": "711902a2c7ee43eb",
-   "text": "PlugMan is a plugin manager for Federated Wiki. It began life as an explicit clone of Ward Cunningham's [[Plugmatic]] plugin (v1.5.1) and keeps its markup and routes while growing new administration features."
-  },
-  {
-   "type": "paragraph",
-   "id": "2f538303a2750c3b",
-   "text": "This plugin queries the origin server for information about installed plugins. Server administrators can install new or updated existing plugins from included inventories."
-  },
-  {
-   "type": "paragraph",
-   "id": "725d380d0f4119c6",
-   "text": "See [[PlugMan Browse]] also in the hamburger (\u2630) menu."
-  },
-  {
-   "type": "plugman",
-   "id": "aa516c1dac55e70b",
-   "text": "NAME\nPAGES\nBUNDLED\nINSTALLED\nSERVICE"
-  },
-  {
-   "type": "markdown",
-   "id": "2d06e967877db124",
-   "text": "# Markup"
-  },
-  {
-   "type": "paragraph",
-   "id": "b6188808197e3b69",
-   "text": "Markup lines may include a full plugin name or a keyword. Keywords select columns and column order for reporting properties of each plugin."
-  },
-  {
-   "type": "paragraph",
-   "id": "48788863a76362b3",
-   "text": "Say STATUS for a traffic light indicating install options."
-  },
-  {
-   "type": "paragraph",
-   "id": "405b19fdcca54bb4",
-   "text": "Say NAME for the plugin name, sans wiki-plugin- prefix."
-  },
-  {
-   "type": "paragraph",
-   "id": "826eb0f7d761ce48",
-   "text": "Say MENU for Factory menu category, blank if unlisted."
-  },
-  {
-   "type": "paragraph",
-   "id": "565ef5763ec2cd95",
-   "text": "Say PAGES for count of about pages, blank if none."
-  },
-  {
-   "type": "paragraph",
-   "id": "0887156a2681e9ae",
-   "text": "Say SERVICE for months installed, blank if absent or core."
-  },
-  {
-   "type": "paragraph",
-   "id": "5065dfdf958ce3d9",
-   "text": "Say BUNDLED for version in wiki, blank if not bundled."
-  },
-  {
-   "type": "paragraph",
-   "id": "1033c6eede13b0f9",
-   "text": "Say INSTALLED for version now installed, blank if absent."
-  },
-  {
-   "type": "paragraph",
-   "id": "856d733cdab8fd8e",
-   "text": "Say PUBLISHED for version posted to npm, blank if none."
-  },
-  {
-   "type": "paragraph",
-   "id": "698979e7fd5fce6e",
-   "text": "If no columns are requested a default list will be provided. Both STATUS and PUBLISHED require slow queries of npm so these are avoided except when specific plugins are inventoried."
-  },
-  {
-   "type": "paragraph",
-   "id": "332c5da9a77f5fb4",
-   "text": "Say BROWSE to show the about page browsing menu."
-  },
-  {
-   "type": "markdown",
-   "id": "de8a0565948198d8",
-   "text": "# Sections"
-  },
-  {
-   "type": "paragraph",
-   "id": "0315a858ae8a6314",
-   "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
-  },
-  {
-   "type": "paragraph",
-   "id": "c20e6bf9f5636ddd",
-   "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
-  },
-  {
-   "type": "markdown",
-   "id": "aa885e328893b9da",
-   "text": "# Sync"
-  },
-  {
-   "type": "paragraph",
-   "id": "80c77d6b524b1939",
-   "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
-  },
-  {
-   "type": "markdown",
-   "id": "69d2b6f107f29fe6",
-   "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
-  },
-  {
-   "type": "markdown",
-   "id": "b97294e60a0ef05d",
-   "text": "## Security"
-  },
-  {
-   "type": "markdown",
-   "id": "07603616475c51ea",
-   "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
-  }
- ],
- "journal": [
-  {
-   "type": "create",
-   "id": "841d5d371364c6ed",
-   "item": {
-    "title": "About PlugMan Plugin",
-    "story": [
-     {
+  "title": "About PlugMan Plugin",
+  "story": [
+    {
       "type": "paragraph",
       "id": "711902a2c7ee43eb",
       "text": "PlugMan is a plugin manager for Federated Wiki. It began life as an explicit clone of Ward Cunningham's [[Plugmatic]] plugin (v1.5.1) and keeps its markup and routes while growing new administration features."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "2f538303a2750c3b",
       "text": "This plugin queries the origin server for information about installed plugins. Server administrators can install new or updated existing plugins from included inventories."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "725d380d0f4119c6",
       "text": "See [[PlugMan Browse]] also in the hamburger (\u2630) menu."
-     },
-     {
+    },
+    {
       "type": "plugman",
       "id": "aa516c1dac55e70b",
       "text": "NAME\nPAGES\nBUNDLED\nINSTALLED\nSERVICE"
-     },
-     {
+    },
+    {
       "type": "markdown",
       "id": "2d06e967877db124",
       "text": "# Markup"
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "b6188808197e3b69",
       "text": "Markup lines may include a full plugin name or a keyword. Keywords select columns and column order for reporting properties of each plugin."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "48788863a76362b3",
       "text": "Say STATUS for a traffic light indicating install options."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "405b19fdcca54bb4",
       "text": "Say NAME for the plugin name, sans wiki-plugin- prefix."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "826eb0f7d761ce48",
       "text": "Say MENU for Factory menu category, blank if unlisted."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "565ef5763ec2cd95",
       "text": "Say PAGES for count of about pages, blank if none."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "0887156a2681e9ae",
       "text": "Say SERVICE for months installed, blank if absent or core."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "5065dfdf958ce3d9",
       "text": "Say BUNDLED for version in wiki, blank if not bundled."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "1033c6eede13b0f9",
       "text": "Say INSTALLED for version now installed, blank if absent."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "856d733cdab8fd8e",
       "text": "Say PUBLISHED for version posted to npm, blank if none."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "698979e7fd5fce6e",
       "text": "If no columns are requested a default list will be provided. Both STATUS and PUBLISHED require slow queries of npm so these are avoided except when specific plugins are inventoried."
-     },
-     {
+    },
+    {
       "type": "paragraph",
       "id": "332c5da9a77f5fb4",
       "text": "Say BROWSE to show the about page browsing menu."
-     }
-    ]
-   },
-   "date": 1786291816503,
-   "provenance": "Cloned from wiki-plugin-plugmatic v1.5.1 by Claude Code with David Bovill"
-  },
-  {
-   "type": "add",
-   "id": "69d2b6f107f29fe6",
-   "date": 1786292188649,
-   "item": {
-    "type": "markdown",
-    "id": "69d2b6f107f29fe6",
-    "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
-   }
-  },
-  {
-   "type": "add",
-   "id": "b97294e60a0ef05d",
-   "date": 1786300248279,
-   "item": {
-    "type": "markdown",
-    "id": "b97294e60a0ef05d",
-    "text": "## Security"
-   }
-  },
-  {
-   "type": "add",
-   "id": "07603616475c51ea",
-   "date": 1786300248279,
-   "item": {
-    "type": "markdown",
-    "id": "07603616475c51ea",
-    "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
-   }
-  },
-  {
-   "type": "add",
-   "id": "de8a0565948198d8",
-   "date": 1786308144311,
-   "item": {
-    "type": "markdown",
-    "id": "de8a0565948198d8",
-    "text": "# Sections"
-   }
-  },
-  {
-   "type": "add",
-   "id": "0315a858ae8a6314",
-   "date": 1786308144311,
-   "item": {
-    "type": "paragraph",
-    "id": "0315a858ae8a6314",
-    "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
-   }
-  },
-  {
-   "type": "add",
-   "id": "c20e6bf9f5636ddd",
-   "date": 1786308144311,
-   "item": {
-    "type": "paragraph",
-    "id": "c20e6bf9f5636ddd",
-    "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
-   }
-  },
-  {
-   "type": "add",
-   "id": "aa885e328893b9da",
-   "date": 1786308690866,
-   "item": {
-    "type": "markdown",
-    "id": "aa885e328893b9da",
-    "text": "# Sync"
-   }
-  },
-  {
-   "type": "add",
-   "id": "80c77d6b524b1939",
-   "date": 1786308690866,
-   "item": {
-    "type": "paragraph",
-    "id": "80c77d6b524b1939",
-    "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
-   }
-  }
- ],
- "plugin": "plugman"
+    },
+    {
+      "type": "markdown",
+      "id": "de8a0565948198d8",
+      "text": "# Sections"
+    },
+    {
+      "type": "paragraph",
+      "id": "0315a858ae8a6314",
+      "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
+    },
+    {
+      "type": "paragraph",
+      "id": "c20e6bf9f5636ddd",
+      "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
+    },
+    {
+      "type": "markdown",
+      "id": "aa885e328893b9da",
+      "text": "# Sync"
+    },
+    {
+      "type": "paragraph",
+      "id": "80c77d6b524b1939",
+      "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
+    },
+    {
+      "type": "markdown",
+      "id": "601f24a8b01bec46",
+      "text": "# The Key Door\n\nEvery admin route answers to the wiki's admin, as before, or to a caller presenting an `X-Api-Key` listed in this site's `status/api-keys.json`. The file maps a scope to secrets and each secret to a holder \u2014 `*` for every route, or one of `plugman.install`, `plugman.update`, `plugman.uninstall`, `plugman.restart`, `plugman.view`, `plugman.status`, `plugman.catalog`. The wiki never serves the status folder; on a file-synced farm the file arrives by the same pipe as the pages. A keyed call is logged with the holder's id and the package it touched. `GET /plugin/plugman/key.json` says whether the key you present is accepted here and for which scopes, naming the holder and never the secret; `ready` says whether the site offers a door at all."
+    },
+    {
+      "type": "markdown",
+      "id": "4588bb114b14943f",
+      "text": "The same file, in the same shape, is read by the Farm Plugin for its mounted writes. The sharing is the format and not the code: neither plugin needs the other installed. On the laptop, `wiki-farm-key mint <site>` writes the file and keeps the secret in the Keychain, and `wiki-plugman update-all <site>` brings a farm's plugins current without a browser \u2014 see [[Farm Key Plan]]."
+    },
+    {
+      "type": "markdown",
+      "id": "69d2b6f107f29fe6",
+      "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
+    },
+    {
+      "type": "markdown",
+      "id": "b97294e60a0ef05d",
+      "text": "## Security"
+    },
+    {
+      "type": "markdown",
+      "id": "07603616475c51ea",
+      "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
+    }
+  ],
+  "journal": [
+    {
+      "type": "create",
+      "id": "841d5d371364c6ed",
+      "item": {
+        "title": "About PlugMan Plugin",
+        "story": [
+          {
+            "type": "paragraph",
+            "id": "711902a2c7ee43eb",
+            "text": "PlugMan is a plugin manager for Federated Wiki. It began life as an explicit clone of Ward Cunningham's [[Plugmatic]] plugin (v1.5.1) and keeps its markup and routes while growing new administration features."
+          },
+          {
+            "type": "paragraph",
+            "id": "2f538303a2750c3b",
+            "text": "This plugin queries the origin server for information about installed plugins. Server administrators can install new or updated existing plugins from included inventories."
+          },
+          {
+            "type": "paragraph",
+            "id": "725d380d0f4119c6",
+            "text": "See [[PlugMan Browse]] also in the hamburger (\u2630) menu."
+          },
+          {
+            "type": "plugman",
+            "id": "aa516c1dac55e70b",
+            "text": "NAME\nPAGES\nBUNDLED\nINSTALLED\nSERVICE"
+          },
+          {
+            "type": "markdown",
+            "id": "2d06e967877db124",
+            "text": "# Markup"
+          },
+          {
+            "type": "paragraph",
+            "id": "b6188808197e3b69",
+            "text": "Markup lines may include a full plugin name or a keyword. Keywords select columns and column order for reporting properties of each plugin."
+          },
+          {
+            "type": "paragraph",
+            "id": "48788863a76362b3",
+            "text": "Say STATUS for a traffic light indicating install options."
+          },
+          {
+            "type": "paragraph",
+            "id": "405b19fdcca54bb4",
+            "text": "Say NAME for the plugin name, sans wiki-plugin- prefix."
+          },
+          {
+            "type": "paragraph",
+            "id": "826eb0f7d761ce48",
+            "text": "Say MENU for Factory menu category, blank if unlisted."
+          },
+          {
+            "type": "paragraph",
+            "id": "565ef5763ec2cd95",
+            "text": "Say PAGES for count of about pages, blank if none."
+          },
+          {
+            "type": "paragraph",
+            "id": "0887156a2681e9ae",
+            "text": "Say SERVICE for months installed, blank if absent or core."
+          },
+          {
+            "type": "paragraph",
+            "id": "5065dfdf958ce3d9",
+            "text": "Say BUNDLED for version in wiki, blank if not bundled."
+          },
+          {
+            "type": "paragraph",
+            "id": "1033c6eede13b0f9",
+            "text": "Say INSTALLED for version now installed, blank if absent."
+          },
+          {
+            "type": "paragraph",
+            "id": "856d733cdab8fd8e",
+            "text": "Say PUBLISHED for version posted to npm, blank if none."
+          },
+          {
+            "type": "paragraph",
+            "id": "698979e7fd5fce6e",
+            "text": "If no columns are requested a default list will be provided. Both STATUS and PUBLISHED require slow queries of npm so these are avoided except when specific plugins are inventoried."
+          },
+          {
+            "type": "paragraph",
+            "id": "332c5da9a77f5fb4",
+            "text": "Say BROWSE to show the about page browsing menu."
+          }
+        ]
+      },
+      "date": 1786291816503,
+      "provenance": "Cloned from wiki-plugin-plugmatic v1.5.1 by Claude Code with David Bovill"
+    },
+    {
+      "type": "add",
+      "id": "69d2b6f107f29fe6",
+      "date": 1786292188649,
+      "item": {
+        "type": "markdown",
+        "id": "69d2b6f107f29fe6",
+        "text": "## Repositories\n\n[https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-plugman GitHub: wiki-plugin-plugman]\n\n[https://www.npmjs.com/package/wiki-plugin-plugman npm: wiki-plugin-plugman]"
+      }
+    },
+    {
+      "type": "add",
+      "id": "b97294e60a0ef05d",
+      "date": 1786300248279,
+      "item": {
+        "type": "markdown",
+        "id": "b97294e60a0ef05d",
+        "text": "## Security"
+      }
+    },
+    {
+      "type": "add",
+      "id": "07603616475c51ea",
+      "date": 1786300248279,
+      "item": {
+        "type": "markdown",
+        "id": "07603616475c51ea",
+        "text": "PlugMan's admin routes install npm packages and restart the server, so an administrator can run code on the host. Safe by default. See [[PlugMan Security]]."
+      }
+    },
+    {
+      "type": "add",
+      "id": "de8a0565948198d8",
+      "date": 1786308144311,
+      "item": {
+        "type": "markdown",
+        "id": "de8a0565948198d8",
+        "text": "# Sections"
+      }
+    },
+    {
+      "type": "add",
+      "id": "0315a858ae8a6314",
+      "date": 1786308144311,
+      "item": {
+        "type": "paragraph",
+        "id": "0315a858ae8a6314",
+        "text": "A section keyword scopes the plugin lines that follow it. Say FARM and a domain to inspect and manage a remote farm over REST. Say PRIVATE to mark the plugins under it as private or localhost-only, so the sync tool leaves them off lists built for a public farm. Say LOCAL to return to the ordinary local scope."
+      }
+    },
+    {
+      "type": "add",
+      "id": "c20e6bf9f5636ddd",
+      "date": 1786308144311,
+      "item": {
+        "type": "paragraph",
+        "id": "c20e6bf9f5636ddd",
+        "text": "A plugin that is symlinked for development but has no npm release shows an \"unpublished\" badge \u2014 these are the plugins in the Not-Published set. A private plugin shows a lock."
+      }
+    },
+    {
+      "type": "add",
+      "id": "aa885e328893b9da",
+      "date": 1786308690866,
+      "item": {
+        "type": "markdown",
+        "id": "aa885e328893b9da",
+        "text": "# Sync"
+      }
+    },
+    {
+      "type": "add",
+      "id": "80c77d6b524b1939",
+      "date": 1786308690866,
+      "item": {
+        "type": "paragraph",
+        "id": "80c77d6b524b1939",
+        "text": "Say SYNC, optionally with a target domain, for a panel that merges plugin lists from several sources \u2014 this laptop, the Not-Published set, and each FARM named in the item \u2014 into a new list. Choose a target server and press Build: PlugMan opens a ghost page listing the merged plugins, which you prune and fork to save as that server's roster. Private plugins are left out when the target is a public farm and kept for localhost."
+      }
+    },
+    {
+      "type": "add",
+      "id": "601f24a8b01bec46",
+      "item": {
+        "type": "markdown",
+        "id": "601f24a8b01bec46",
+        "text": "# The Key Door\n\nEvery admin route answers to the wiki's admin, as before, or to a caller presenting an `X-Api-Key` listed in this site's `status/api-keys.json`. The file maps a scope to secrets and each secret to a holder \u2014 `*` for every route, or one of `plugman.install`, `plugman.update`, `plugman.uninstall`, `plugman.restart`, `plugman.view`, `plugman.status`, `plugman.catalog`. The wiki never serves the status folder; on a file-synced farm the file arrives by the same pipe as the pages. A keyed call is logged with the holder's id and the package it touched. `GET /plugin/plugman/key.json` says whether the key you present is accepted here and for which scopes, naming the holder and never the secret; `ready` says whether the site offers a door at all."
+      },
+      "after": "80c77d6b524b1939",
+      "date": 1788431893768,
+      "provenance": "Claude Code, 3 September 2026"
+    },
+    {
+      "type": "add",
+      "id": "4588bb114b14943f",
+      "item": {
+        "type": "markdown",
+        "id": "4588bb114b14943f",
+        "text": "The same file, in the same shape, is read by the Farm Plugin for its mounted writes. The sharing is the format and not the code: neither plugin needs the other installed. On the laptop, `wiki-farm-key mint <site>` writes the file and keeps the secret in the Keychain, and `wiki-plugman update-all <site>` brings a farm's plugins current without a browser \u2014 see [[Farm Key Plan]]."
+      },
+      "after": "601f24a8b01bec46",
+      "date": 1788431893768,
+      "provenance": "Claude Code, 3 September 2026"
+    }
+  ],
+  "plugin": "plugman"
 }

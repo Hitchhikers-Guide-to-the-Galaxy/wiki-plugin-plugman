@@ -17,6 +17,7 @@ import jsonfile from 'jsonfile'
 import https from 'node:https'
 import { execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import * as keys from './keys.js'
 
 const hexId = () => randomBytes(8).toString('hex')
 
@@ -209,15 +210,30 @@ const startServer = function (params) {
   // Fix over plugmatic v1.5.1: the original reassigned its own function
   // binding to a string on the failure path, destroying the middleware for
   // every later request in the process.
-  const admin = function (req, res, next) {
-    if (app.securityhandler.isAdmin(req)) {
-      return next()
-    } else {
+  //
+  // Every admin route names its own scope. The wiki's admin passes as before;
+  // so does a caller presenting an X-Api-Key listed for that scope (or for
+  // "*") in this site's status/api-keys.json — see server/keys.js. A keyed
+  // call is logged with the holder's id and what it touched, so the farm's
+  // log says who changed what without a session ever having existed.
+  const adminFor = function (scope) {
+    const full = `plugman.${scope}`
+    return function (req, res, next) {
+      const verdict = keys.decide({ status: argv.status, req, scope: full, isAdmin: app.securityhandler.isAdmin(req) })
+      if (verdict.ok) {
+        if (verdict.by === 'key') {
+          req.plugmanKey = verdict.holder
+          const what = req.body?.plugin || req.params?.pkg || ''
+          console.log(`${seat} key "${verdict.holder.id}" → ${full} ${what}`.trim())
+        }
+        return next()
+      }
       const adminNote = argv.admin ? undefined : 'none specified'
       const user =
         !req.session?.passport?.user && !req.session?.email && !req.session?.friend ? 'not logged in' : undefined
-      return res.status(403).send({ error: 'service requires admin user', admin: adminNote, user })
+      return res.status(403).send({ error: verdict.why, admin: adminNote, user, scope: full })
     }
+  }
   }
 
   app.get(route('page/:slug.json'), (req, res) =>
@@ -309,7 +325,7 @@ const startServer = function (params) {
   // raw stdout pipe had no error handler. Admin-gated and timeout-bounded so
   // this npm-spawning route cannot be used as an unauthenticated DoS amplifier
   // — only admins need version lists (to install).
-  app.get(route('view/:pkg'), admin, function (req, res) {
+  app.get(route('view/:pkg'), adminFor('view'), function (req, res) {
     if (!/^[\w-]+$/.test(req.params.pkg)) {
       return res.status(400).json({ error: 'invalid plugin name' })
     }
@@ -322,7 +338,7 @@ const startServer = function (params) {
 
   // Fix over plugmatic v1.5.1: requests failing validation now get a 400
   // instead of no response (the original left the request hanging forever).
-  app.post(route('install'), admin, function (req, res) {
+  app.post(route('install'), adminFor('install'), function (req, res) {
     const full = fullName(req.body.plugin)
     if (full && /^[\w.-]+$/.test(req.body.version)) {
       const pkg = `${full}@${req.body.version}`
@@ -353,7 +369,7 @@ const startServer = function (params) {
   // Uninstall a plugin via npm. Guards keep us from breaking the farm or the
   // dev workflow; the post-condition check catches the dependency-without-module
   // state that crashes wiki-server >= 0.40 and restores the module if it happens.
-  app.post(route('uninstall'), admin, function (req, res) {
+  app.post(route('uninstall'), adminFor('uninstall'), function (req, res) {
     const full = fullName(req.body.plugin)
     if (!full) return res.status(400).json({ error: 'invalid plugin name' })
     const dir = `${argv.packageDir}/${full}`
@@ -406,13 +422,34 @@ const startServer = function (params) {
   // a restart, and by remote farms for discovery.
   // pid lets a client tell the freshly-restarted process apart from the old
   // one, which can keep answering during the kill-wait window of a restart.
-  app.get(route('ready'), (req, res) => res.json({ name: 'plugman', seat, version: ownVersion, pid: process.pid }))
+  app.get(route('ready'), (req, res) =>
+    res.json({ name: 'plugman', seat, version: ownVersion, pid: process.pid, keys: keys.offered(argv.status) }),
+  )
+
+  // What the presented key opens here — the holder and the scopes, never the
+  // secret. Open, because it tells a caller only about the key they already
+  // hold, and whether this site has a door at all.
+  app.get(route('key.json'), (req, res) => {
+    const offered = keys.offered(argv.status)
+    const presented = !!req.headers['x-api-key']
+    const scopes = presented ? keys.scopesOf({ status: argv.status, req }) : []
+    const holder = scopes.length ? keys.authorize({ status: argv.status, req, scope: scopes[0] }) : null
+    res.json({
+      site: nodePath.basename(nodePath.dirname(argv.status || '')),
+      offered,
+      presented,
+      accepted: scopes.length > 0,
+      holder: holder ? holder.id : undefined,
+      scopes,
+      admin: !!app.securityhandler.isAdmin(req),
+    })
+  })
 
   // Per-plugin status, driving the Update All progress loop. installed comes
   // from the module's own package.json; published from npm (slow); symlinked
   // and clientOk from the filesystem. Admin-gated: it spawns npm (a DoS
   // amplifier if left open) and only the admin-driven update loop consumes it.
-  app.get(route('status/:pkg'), admin, function (req, res) {
+  app.get(route('status/:pkg'), adminFor('status'), function (req, res) {
     const full = fullName(req.params.pkg)
     if (!full) {
       return res.status(400).json({ error: 'invalid plugin name' })
@@ -467,7 +504,7 @@ const startServer = function (params) {
     })
   }
 
-  app.get(route('catalog'), admin, function (req, res) {
+  app.get(route('catalog'), adminFor('catalog'), function (req, res) {
     const fresh = req.query.refresh === '1'
     const priv = new Set(loadPrivate())
     glob('wiki-{plugin,security}-*', { cwd: argv.packageDir })
@@ -521,7 +558,7 @@ const startServer = function (params) {
   // Update (or install) one plugin to a version, latest by default. Unlike
   // plugmatic's install this validates and ALWAYS responds, refuses to clobber
   // a dev symlink, and bounds npm with a timeout.
-  app.post(route('update'), admin, function (req, res) {
+  app.post(route('update'), adminFor('update'), function (req, res) {
     const full = fullName(req.body.plugin)
     const version = req.body.version || 'latest'
     if (!full || !/^[\w.-]+$/.test(version)) {
@@ -671,7 +708,7 @@ const startServer = function (params) {
     }
   })
 
-  app.post(route('remote/install'), admin, async function (req, res) {
+  app.post(route('remote/install'), adminFor('remote-install'), async function (req, res) {
     const { farm } = req.body
     const full = fullName(req.body.plugin)
     const version = req.body.version || 'latest'
@@ -697,7 +734,7 @@ const startServer = function (params) {
     }
   })
 
-  app.post(route('remote/uninstall'), admin, async function (req, res) {
+  app.post(route('remote/uninstall'), adminFor('remote-uninstall'), async function (req, res) {
     const { farm } = req.body
     const full = fullName(req.body.plugin)
     if (badFarm(farm) || !full) return res.status(400).json({ error: 'invalid/blocked farm or plugin' })
@@ -718,7 +755,7 @@ const startServer = function (params) {
     }
   })
 
-  app.post(route('remote/restart'), admin, async function (req, res) {
+  app.post(route('remote/restart'), adminFor('remote-restart'), async function (req, res) {
     const { farm } = req.body
     if (badFarm(farm)) return res.status(400).json({ error: 'invalid or blocked farm' })
     try {
@@ -838,7 +875,7 @@ const startServer = function (params) {
   // laptop farm, where it would just kill the farm. So prefer a configured
   // restart command (argv.plugman_restart / PLUGMAN_RESTART) that relaunches
   // the farm itself, and fall back to exit(0) where a supervisor exists.
-  return app.post(route('restart'), admin, function (req, res) {
+  return app.post(route('restart'), adminFor('restart'), function (req, res) {
     const cmd = argv.plugman_restart || process.env.PLUGMAN_RESTART
     if (cmd) {
       console.log(`${seat} restart via configured command: ${cmd}`)
