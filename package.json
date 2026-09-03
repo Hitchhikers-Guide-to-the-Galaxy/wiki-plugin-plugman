@@ -1,6 +1,6 @@
 {
   "name": "wiki-plugin-plugman",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Federated Wiki - PlugMan Plugin, a plugin manager grown from a clone of Plugmatic",
   "keywords": [
     "plugman",

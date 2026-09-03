@@ -491,7 +491,7 @@ const startServer = function (params) {
     const hit = publishedCache.get(full)
     if (!fresh && hit && Date.now() - hit.at < PUB_TTL) return done(hit.version)
     return execFile('npm', ['view', full, 'version', '--json'], { timeout: 30000 }, function (err, stdout) {
-      let version = null
+      let version
       try {
         const parsed = JSON.parse(stdout)
         version = parsed && typeof parsed === 'object' && parsed.error ? null : parsed

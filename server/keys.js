@@ -34,7 +34,7 @@ export const load = statusDir => {
   }
   const hit = cache.get(statusDir)
   if (hit && hit.mtimeMs === stat.mtimeMs) return hit.keys
-  let keys = null
+  let keys
   try {
     keys = JSON.parse(fs.readFileSync(file, 'utf8'))
     if (!keys || typeof keys !== 'object' || Array.isArray(keys)) keys = null
