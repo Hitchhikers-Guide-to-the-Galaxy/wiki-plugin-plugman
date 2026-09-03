@@ -234,7 +234,6 @@ const startServer = function (params) {
       return res.status(403).send({ error: verdict.why, admin: adminNote, user, scope: full })
     }
   }
-  }
 
   app.get(route('page/:slug.json'), (req, res) =>
     plugmap(function (err, install) {
